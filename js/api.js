@@ -1,5 +1,6 @@
 // Handle GAS communication and offline logs
-const GAS_URL = 'YOUR_GAS_WEB_APP_URL_HERE';
+const GAS_URL = https://script.google.com/macros/s/AKfycbzD2kOgmCwyG_jVItzW5e7OM54d2nA8JDr_Su-p6KfErkcR-VVRilVK1jFEMFLZ5Sb78w/exec
+
 
 async function sendLog(logData) {
     let queue = JSON.parse(localStorage.getItem('log_queue') || '[]');
@@ -19,15 +20,12 @@ async function syncLogs() {
     
     for (let log of pending) {
         try {
-            // Uncomment when GAS is ready
-            /*
             await fetch(GAS_URL, {
                 method: 'POST',
                 mode: 'no-cors',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(log)
             });
-            */
             log.status = 'SYNCED';
         } catch (e) {
             console.error('Sync failed', e);

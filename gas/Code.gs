@@ -9,11 +9,9 @@ function doPost(e) {
     
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
-      // Setup headers for new sheet (simplified)
       sheet.appendRow(['log_id', 'session_id', 'participant_id', 'record_type', 'timestamp']);
     }
     
-    // Append row
     sheet.appendRow([
       data.log_id,
       data.session_id,

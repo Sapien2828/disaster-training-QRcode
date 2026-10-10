@@ -52,7 +52,8 @@ button:focus-visible { outline: 3px solid #8ab4e8; outline-offset: 2px; }
 
 .camera-section { height: 60vh; display: flex; justify-content: center; align-items: center; background: #000; position: relative;}
 #video { width: 100%; height: 100%; object-fit: cover; }
-.qr-guide { position: absolute; border: 2px dashed rgba(255,255,255,0.5); width: 200px; height: 200px; }
+.qr-guide { position: absolute; border: 2px dashed rgba(255,255,255,0.5); width: 200px; height: 200px; z-index: 10; pointer-events: none;}
+#canvas { position: absolute; top:0; left:0; width:100%; height:100%; object-fit: cover; z-index:5; pointer-events:none;}
 
 .log-section { display: flex; height: 20vh; border-top: 1px solid var(--color-border); }
 .log-left, .log-right { flex: 1; padding: 10px; overflow-y: auto; border-right: 1px solid var(--color-border); }
@@ -66,5 +67,5 @@ li { margin-bottom: 5px; border-bottom: 1px solid var(--color-border); padding-b
 
 .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(7, 20, 38, 0.9); display: flex; justify-content: center; align-items: center; z-index: 1000; }
 .modal.hidden { display: none; }
-.modal-content { background: var(--color-surface); padding: 20px; width: 90%; border: 1px solid var(--color-border); }
+.modal-content { background: var(--color-surface); padding: 20px; width: 90%; border: 1px solid var(--color-border); max-height: 90vh; overflow-y: auto;}
 .modal-options button { margin-bottom: 10px; }
