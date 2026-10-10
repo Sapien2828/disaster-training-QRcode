@@ -2,6 +2,7 @@
 let scanning = false;
 let streamRef = null;
 let masterData = []; // CSVから読み込んだデータを保持
+let currentEventRecord = null; // 現在表示中のEVENTレコード
 
 document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------
@@ -67,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -----------------------------------------
-    // カメラ起動ロジック (エラー対応強化)
+    // カメラ起動ロジック
     // -----------------------------------------
     const video = document.getElementById('video');
     const canvasElement = document.getElementById('canvas');
@@ -76,16 +77,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (startCameraBtn && video && canvasElement) {
         startCameraBtn.addEventListener('click', () => {
-            // HTTPS環境チェック
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert("【エラー】カメラにアクセスできません。URLが「https://」で始まっているか、ブラウザの権限設定を確認してください。");
+                alert("【エラー】カメラにアクセスできません。URLが「https://」で始まっているか確認してください。");
                 return;
             }
 
             navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function(stream) {
                 streamRef = stream;
                 video.srcObject = stream;
-                video.setAttribute("playsinline", true); // iOS Safari対策
+                video.setAttribute("playsinline", true);
                 video.play();
                 video.hidden = false;
                 startCameraBtn.hidden = true;
@@ -123,10 +123,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function handleQRCodeScan(scannedCode) {
-        // 前ゼロ埋めの処理など（必要に応じて）
-        const formattedCode = scannedCode.padStart(4, '0');
+        // card_noは4桁のゼロ埋め文字列として扱う
+        const formattedCode = scannedCode.trim().padStart(4, '0');
         
-        // CSVデータとの照合 (card_no と difficulty が一致し、active=TRUEのもの)
+        // 難易度とcard_noでレコード検索
         const matchedRecord = masterData.find(row => 
             row.card_no === formattedCode && 
             row.difficulty === session.difficulty &&
@@ -134,42 +134,151 @@ document.addEventListener('DOMContentLoaded', () => {
         );
 
         if (matchedRecord) {
-            let htmlBody = `
-                <p><strong>種類:</strong> ${matchedRecord.record_type}</p>
-                <p><strong>場所:</strong> ${matchedRecord.location_name}</p>
-            `;
-            
+            // レコードタイプごとの表示切り替え
             if (matchedRecord.record_type === 'EVENT') {
-                htmlBody += `
-                    <p style="color:var(--color-danger); font-weight:bold;">${matchedRecord.event_name}</p>
-                    <p>${matchedRecord.event_body}</p>
-                `;
+                showEventModal(matchedRecord);
             } else if (matchedRecord.record_type === 'ITEM') {
-                htmlBody += `<p>発見: <strong>${matchedRecord.item_name}</strong></p>`;
+                showItemCheckModal(matchedRecord, 'ITEM');
             } else if (matchedRecord.record_type === 'CHECK') {
-                htmlBody += `<p>確認: <strong>${matchedRecord.check_name}</strong></p>`;
+                showItemCheckModal(matchedRecord, 'CHECK');
+            } else {
+                showModal("エラー", "不正なレコードタイプです。");
             }
-
-            // CSVのデータをそのままログとして送信
-            matchedRecord.session_id = session.session_id;
-            matchedRecord.participant_id = session.participant_id;
-            matchedRecord.timestamp = new Date().toISOString();
-            
-            if (typeof sendLog === 'function') {
-                sendLog(matchedRecord);
-            }
-
-            // 画面の下部ログに追加
-            addLogToScreen(matchedRecord);
-
-            showModal("検知成功", htmlBody);
         } else {
-            showModal("未登録コード", `読み取ったコード（${scannedCode}）は、現在の難易度（${session.difficulty}）のデータに存在しません。`);
+            showModal("未登録コード", `コード（${formattedCode}）は現在の難易度（${session.difficulty}）に存在しません。`);
         }
+    }
+
+    // -----------------------------------------
+    // EVENT表示と回答処理
+    // -----------------------------------------
+    function showEventModal(record) {
+        currentEventRecord = record;
+        
+        const titleText = `【EVENT】${record.location_name}`;
+        const bodyHtml = `
+            <div style="text-align: center; margin-bottom: 10px;">
+                <p style="color:var(--color-danger); font-weight:bold; font-size: 1.2em;">${record.event_name}</p>
+            </div>
+            <p>${record.event_body}</p>
+            <p style="font-size: 0.8em; color: var(--color-text-muted);">※選択肢を選んでください。</p>
+        `;
+        
+        // 選択肢の生成
+        const optsContainer = document.getElementById('modalOptions');
+        optsContainer.innerHTML = ''; // クリア
+        
+        const options = [
+            { text: record.option_a_name, score: record.option_a_score, outcome: record.option_a_outcome },
+            { text: record.option_b_name, score: record.option_b_score, outcome: record.option_b_outcome },
+            { text: record.option_c_name, score: record.option_c_score, outcome: record.option_c_outcome }
+        ];
+
+        // 選択肢1〜3
+        options.forEach((opt, index) => {
+            if (opt.text && opt.text.trim() !== '') {
+                const btn = document.createElement('button');
+                btn.className = 'btn-primary';
+                btn.innerText = opt.text;
+                btn.onclick = () => handleEventAnswer(index + 1, opt);
+                optsContainer.appendChild(btn);
+            }
+        });
+
+        // 選択肢4 (保留など)
+        if (record.option_d_name && record.option_d_name.trim() !== '') {
+            const btnD = document.createElement('button');
+            btnD.className = 'btn-primary';
+            btnD.style.backgroundColor = 'var(--color-surface-raised)'; // 保留は色を分ける
+            btnD.innerText = record.option_d_name;
+            btnD.onclick = () => handleEventAnswer(4, { text: record.option_d_name, score: record.option_d_score, outcome: record.option_d_outcome });
+            optsContainer.appendChild(btnD);
+        }
+
+        showModal(titleText, bodyHtml, false); // 閉じるボタンは出さない
+    }
+
+    // 回答選択時の処理
+    window.handleEventAnswer = function(optionIndex, optionData) {
+        const record = currentEventRecord;
+        const session = JSON.parse(localStorage.getItem('disaster_training_session'));
+        
+        // 結果画面の表示
+        const resultBody = `
+            <p style="font-weight:bold; color:var(--color-primary);">選択: ${optionData.text}</p>
+            <div style="background:var(--color-surface-raised); padding:10px; margin-top:10px; border-radius:5px;">
+                <p><strong>【結果】</strong><br>${optionData.outcome}</p>
+            </div>
+        `;
+        
+        // ログの送信
+        const logData = {
+            ...record,
+            session_id: session.session_id,
+            participant_id: session.participant_id,
+            timestamp: new Date().toISOString(),
+            selected_option: optionData.text,
+            option_score: optionData.score
+        };
+        
+        if (typeof sendLog === 'function') sendLog(logData);
+        addLogToScreen(logData);
+
+        // モーダルの更新 (結果表示と閉じるボタン)
+        const optsContainer = document.getElementById('modalOptions');
+        optsContainer.innerHTML = '';
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'btn-primary';
+        closeBtn.innerText = 'OK (カメラへ戻る)';
+        closeBtn.onclick = closeModal;
+        optsContainer.appendChild(closeBtn);
+
+        document.getElementById('modalTitle').innerText = 'アクション結果';
+        document.getElementById('modalBody').innerHTML = resultBody;
+    };
+
+    // -----------------------------------------
+    // ITEM / CHECK 表示処理
+    // -----------------------------------------
+    function showItemCheckModal(record, type) {
+        const session = JSON.parse(localStorage.getItem('disaster_training_session'));
+        const isItem = type === 'ITEM';
+        const titleText = isItem ? `【ITEM発見】` : `【CHECK完了】`;
+        const itemName = isItem ? record.item_name : record.check_name;
+        
+        const bodyHtml = `
+            <div style="text-align: center; margin: 20px 0;">
+                <p style="font-size: 1.5em; font-weight: bold; color: var(--color-success);">${itemName}</p>
+                <p>場所: ${record.location_name}</p>
+            </div>
+        `;
+
+        const logData = {
+            ...record,
+            session_id: session.session_id,
+            participant_id: session.participant_id,
+            timestamp: new Date().toISOString()
+        };
+
+        if (typeof sendLog === 'function') sendLog(logData);
+        addLogToScreen(logData);
+
+        // モーダルの更新
+        const optsContainer = document.getElementById('modalOptions');
+        optsContainer.innerHTML = '';
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'btn-primary';
+        closeBtn.innerText = 'OK (カメラへ戻る)';
+        closeBtn.onclick = closeModal;
+        optsContainer.appendChild(closeBtn);
+
+        showModal(titleText, bodyHtml, false);
     }
 });
 
-// モーダルとログ表示ロジック
+// -----------------------------------------
+// ユーティリティ関数
+// -----------------------------------------
 function addLogToScreen(record) {
     const activityLog = document.getElementById('activityLog');
     const foundItems = document.getElementById('foundItems');
@@ -177,8 +286,12 @@ function addLogToScreen(record) {
     
     if (activityLog) {
         const li = document.createElement('li');
-        const name = record.event_name || record.item_name || record.check_name || "アクション";
-        li.innerHTML = `<span>[${timeStr}]</span> ${record.record_type}: ${name}`;
+        let name = "";
+        if(record.record_type === 'EVENT') name = `${record.event_name} (${record.selected_option})`;
+        else if(record.record_type === 'ITEM') name = record.item_name;
+        else if(record.record_type === 'CHECK') name = record.check_name;
+        
+        li.innerHTML = `<span>[${timeStr}]</span> <span style="color:var(--color-primary)">${record.record_type}</span>: ${name}`;
         activityLog.prepend(li);
     }
     
@@ -189,21 +302,33 @@ function addLogToScreen(record) {
     }
 }
 
-function showModal(titleText, bodyHtml) {
+function showModal(titleText, bodyHtml, showDefaultCloseBtn = true) {
     const modal = document.getElementById('modal');
     const title = document.getElementById('modalTitle');
     const body = document.getElementById('modalBody');
+    const opts = document.getElementById('modalOptions');
     if(!modal) return;
     
     title.innerText = titleText;
     body.innerHTML = bodyHtml;
+    
+    if (showDefaultCloseBtn) {
+        opts.innerHTML = '';
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'btn-primary';
+        closeBtn.innerText = '閉じる';
+        closeBtn.onclick = closeModal;
+        opts.appendChild(closeBtn);
+    }
+    
     modal.classList.remove('hidden');
 }
 
-function closeModal() {
+window.closeModal = function() {
     const modal = document.getElementById('modal');
     if(modal) modal.classList.add('hidden');
     
+    // スキャン再開
     scanning = true;
     requestAnimationFrame(() => {
         const video = document.getElementById('video');
@@ -211,7 +336,7 @@ function closeModal() {
             document.dispatchEvent(new Event('resumeScan'));
         }
     });
-}
+};
 
 document.addEventListener('resumeScan', () => {
     const video = document.getElementById('video');
@@ -228,10 +353,18 @@ document.addEventListener('resumeScan', () => {
             
             if (code) {
                 scanning = false;
-                // document.addEventListener内の handleQRCodeScan を直接呼べないためリロードするかカスタムイベント
-                // 簡略化のため、アラートのみ表示して再度閉じる処理
-                const formatted = code.data.padStart(4, '0');
-                showModal("QR再検知", `読み取り: ${formatted}`);
+                // QR再検知の処理
+                const formatted = code.data.trim().padStart(4, '0');
+                
+                const session = JSON.parse(localStorage.getItem('disaster_training_session'));
+                const matchedRecord = masterData.find(row => row.card_no === formatted && row.difficulty === session.difficulty);
+                
+                if (matchedRecord) {
+                    if (matchedRecord.record_type === 'EVENT') window.showEventModal(matchedRecord);
+                    else window.showItemCheckModal(matchedRecord, matchedRecord.record_type);
+                } else {
+                    window.showModal("未登録コード", `コード（${formatted}）は見つかりません。`);
+                }
                 return;
             }
         }
@@ -248,9 +381,7 @@ function showEndScreen() {
     if(!modal) return;
     
     scanning = false;
-    if (streamRef) {
-        streamRef.getTracks().forEach(track => track.stop());
-    }
+    if (streamRef) streamRef.getTracks().forEach(track => track.stop());
     
     title.innerText = '訓練終了';
     title.style.color = 'var(--color-danger)';
