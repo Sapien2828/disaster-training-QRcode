@@ -1,13 +1,11 @@
 // Main application logic
 let scanning = false;
 let streamRef = null;
-let masterData = []; // CSVから読み込んだデータを保持
-let currentEventRecord = null; // 現在表示中のEVENTレコード
+let masterData = []; 
+let currentEventRecord = null; 
+let visitedPoints = []; 
 
 document.addEventListener('DOMContentLoaded', () => {
-    // -----------------------------------------
-    // Phase 1: 開始画面ロジック
-    // -----------------------------------------
     const startForm = document.getElementById('startForm');
     if (startForm) {
         startForm.addEventListener('submit', (e) => {
@@ -31,9 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // -----------------------------------------
-    // Phase 2: データ読み込み & タイマーロジック
-    // -----------------------------------------
     const timeDisplay = document.getElementById('timeDisplay');
     const timerDisplay = document.getElementById('timerDisplay');
     const session = JSON.parse(localStorage.getItem('disaster_training_session'));
@@ -59,45 +54,54 @@ document.addEventListener('DOMContentLoaded', () => {
             const s = diffSec % 60;
             timerDisplay.innerText = `経過: ${m}分${s}秒`;
             
-            if (m >= 30) {
-                showEndScreen();
+            if (m >= 30 && document.getElementById('modalTitle') && document.getElementById('modalTitle').innerText !== '訓練終了') {
+                window.showEndScreen();
             }
         }, 1000);
     }
 
-    // -----------------------------------------
-    // カメラ起動ロジック
-    // -----------------------------------------
     const video = document.getElementById('video');
     const canvasElement = document.getElementById('canvas');
     const canvas = canvasElement ? canvasElement.getContext('2d', { willReadFrequently: true }) : null;
     const startCameraBtn = document.getElementById('startCameraBtn');
+    const restartCameraBtn = document.getElementById('restartCameraBtn');
 
-    if (startCameraBtn && video && canvasElement) {
-        startCameraBtn.addEventListener('click', () => {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert("【エラー】カメラにアクセスできません。URLが「https://」で始まっているか確認してください。");
-                return;
-            }
+    function startCamera() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert("【エラー】カメラにアクセスできません。URLが「https://」で始まっているか確認してください。");
+            return;
+        }
 
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function(stream) {
-                streamRef = stream;
-                video.srcObject = stream;
-                video.setAttribute("playsinline", true);
-                video.play();
-                video.hidden = false;
-                startCameraBtn.hidden = true;
-                scanning = true;
-                requestAnimationFrame(tick);
-            }).catch(function(err) {
-                alert("カメラの起動に失敗しました。権限を確認してください: " + err);
-            });
+        if (streamRef) {
+            streamRef.getTracks().forEach(track => track.stop());
+        }
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function(stream) {
+            streamRef = stream;
+            video.srcObject = stream;
+            video.setAttribute("playsinline", true);
+            video.play();
+            video.hidden = false;
+            
+            if(startCameraBtn) startCameraBtn.style.display = 'none';
+            if(restartCameraBtn) restartCameraBtn.style.display = 'block';
+            
+            scanning = true;
+            requestAnimationFrame(window.tick);
+        }).catch(function(err) {
+            alert("カメラの起動に失敗しました。ブラウザのタブを一度閉じて開き直すか、権限設定を確認してください。\nエラー詳細: " + err);
         });
     }
 
-    // -----------------------------------------
-    // 手動入力ロジックの追加
-    // -----------------------------------------
+    if (startCameraBtn) startCameraBtn.addEventListener('click', startCamera);
+    if (restartCameraBtn) restartCameraBtn.addEventListener('click', startCamera);
+
+    window.addEventListener('beforeunload', () => {
+        if (streamRef) {
+            streamRef.getTracks().forEach(track => track.stop());
+        }
+    });
+
     const manualCodeInput = document.getElementById('manualCodeInput');
     const manualCodeSubmitBtn = document.getElementById('manualCodeSubmitBtn');
 
@@ -109,10 +113,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
-            scanning = false; // カメラ走査を一時停止
+            scanning = false; 
             handleQRCodeScan(code);
-            manualCodeInput.value = ""; // 入力欄をクリア
-            manualCodeInput.blur(); // キーボードを閉じる
+            manualCodeInput.value = ""; 
+            manualCodeInput.blur(); 
         });
         
         manualCodeInput.addEventListener('keypress', function (e) {
@@ -122,12 +126,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // -----------------------------------------
-    // Phase 3: QR検知と照合ロジック
-    // -----------------------------------------
-    function tick() {
+    window.tick = function() {
         if (!scanning) return;
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
             canvasElement.hidden = false;
             canvasElement.height = video.videoHeight;
             canvasElement.width = video.videoWidth;
@@ -139,16 +140,17 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             if (code) {
-                scanning = false; // 一旦停止
+                scanning = false; 
                 handleQRCodeScan(code.data);
                 return; 
             }
         }
-        requestAnimationFrame(tick);
-    }
+        requestAnimationFrame(window.tick);
+    };
     
     function handleQRCodeScan(scannedCode) {
         const formattedCode = scannedCode.trim().padStart(4, '0');
+        const session = JSON.parse(localStorage.getItem('disaster_training_session'));
         
         const matchedRecord = masterData.find(row => 
             row.card_no === formattedCode && 
@@ -159,21 +161,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (matchedRecord) {
             if (matchedRecord.record_type === 'EVENT') {
                 showEventModal(matchedRecord);
-            } else if (matchedRecord.record_type === 'ITEM') {
-                showItemCheckModal(matchedRecord, 'ITEM');
-            } else if (matchedRecord.record_type === 'CHECK') {
-                showItemCheckModal(matchedRecord, 'CHECK');
+            } else if (matchedRecord.record_type === 'ITEM' || matchedRecord.record_type === 'CHECK') {
+                showItemCheckModal(matchedRecord, matchedRecord.record_type);
             } else {
                 showModal("エラー", "不正なレコードタイプです。");
             }
         } else {
-            showModal("未登録コード", `コード（${formattedCode}）は現在の難易度（${session.difficulty}）に存在しません。`);
+            const optsContainer = document.getElementById('modalOptions');
+            optsContainer.innerHTML = '';
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'btn-primary';
+            closeBtn.innerText = '閉じる (再スキャン)';
+            closeBtn.onclick = window.closeModal;
+            optsContainer.appendChild(closeBtn);
+
+            showModal("未登録コード", `入力されたコード（${formattedCode}）は未登録です。`);
         }
     }
 
-    // -----------------------------------------
-    // EVENT表示と回答処理
-    // -----------------------------------------
     function showEventModal(record) {
         currentEventRecord = record;
         
@@ -214,15 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
             optsContainer.appendChild(btnD);
         }
 
-        // 間違えたとき用のキャンセル
-        const cancelBtn = document.createElement('button');
-        cancelBtn.className = 'btn-primary';
-        cancelBtn.style.backgroundColor = 'transparent';
-        cancelBtn.style.border = '1px solid var(--color-border)';
-        cancelBtn.style.color = 'var(--color-text-muted)';
-        cancelBtn.innerText = 'キャンセル (カメラへ戻る)';
-        cancelBtn.onclick = closeModal;
-        optsContainer.appendChild(cancelBtn);
+        // ここで意図的にキャンセルボタンの描画処理を完全に除外しました
 
         showModal(titleText, bodyHtml);
     }
@@ -250,21 +247,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof sendLog === 'function') sendLog(logData);
         addLogToScreen(logData);
 
+        if (record.x_px && record.y_px) {
+            visitedPoints.push({ x: parseFloat(record.x_px), y: parseFloat(record.y_px), type: record.record_type });
+        }
+
         const optsContainer = document.getElementById('modalOptions');
         optsContainer.innerHTML = '';
         const closeBtn = document.createElement('button');
         closeBtn.className = 'btn-primary';
         closeBtn.innerText = 'OK (カメラへ戻る)';
-        closeBtn.onclick = closeModal;
+        closeBtn.onclick = window.closeModal;
         optsContainer.appendChild(closeBtn);
 
         document.getElementById('modalTitle').innerText = 'アクション結果';
         document.getElementById('modalBody').innerHTML = resultBody;
     };
 
-    // -----------------------------------------
-    // ITEM / CHECK 表示処理
-    // -----------------------------------------
     function showItemCheckModal(record, type) {
         const session = JSON.parse(localStorage.getItem('disaster_training_session'));
         const isItem = type === 'ITEM';
@@ -288,12 +286,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof sendLog === 'function') sendLog(logData);
         addLogToScreen(logData);
 
+        if (record.x_px && record.y_px) {
+            visitedPoints.push({ x: parseFloat(record.x_px), y: parseFloat(record.y_px), type: record.record_type });
+        }
+
         const optsContainer = document.getElementById('modalOptions');
         optsContainer.innerHTML = '';
         const closeBtn = document.createElement('button');
         closeBtn.className = 'btn-primary';
         closeBtn.innerText = 'OK (カメラへ戻る)';
-        closeBtn.onclick = closeModal;
+        closeBtn.onclick = window.closeModal;
         optsContainer.appendChild(closeBtn);
 
         showModal(titleText, bodyHtml);
@@ -339,70 +341,76 @@ window.closeModal = function() {
     if(modal) modal.classList.add('hidden');
     
     scanning = true;
-    requestAnimationFrame(() => {
-        const video = document.getElementById('video');
-        if (video && video.srcObject) {
-            document.dispatchEvent(new Event('resumeScan'));
-        }
-    });
+    requestAnimationFrame(window.tick);
 };
 
-document.addEventListener('resumeScan', () => {
-    const video = document.getElementById('video');
-    const canvasElement = document.getElementById('canvas');
-    if (!canvasElement) return;
-    const canvas = canvasElement.getContext('2d');
-    
-    function resumeTick() {
-        if (!scanning) return;
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
-            var imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
-            var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-            
-            if (code) {
-                scanning = false;
-                const formatted = code.data.trim().padStart(4, '0');
-                const session = JSON.parse(localStorage.getItem('disaster_training_session'));
-                const matchedRecord = masterData.find(row => row.card_no === formatted && row.difficulty === session.difficulty);
-                
-                if (matchedRecord) {
-                    if (matchedRecord.record_type === 'EVENT') window.showEventModal(matchedRecord);
-                    else window.showItemCheckModal(matchedRecord, matchedRecord.record_type);
-                } else {
-                    const optsContainer = document.getElementById('modalOptions');
-                    optsContainer.innerHTML = '';
-                    const closeBtn = document.createElement('button');
-                    closeBtn.className = 'btn-primary';
-                    closeBtn.innerText = '閉じる';
-                    closeBtn.onclick = window.closeModal;
-                    optsContainer.appendChild(closeBtn);
-
-                    window.showModal("未登録コード", `コード（${formatted}）は見つかりません。`);
-                }
-                return;
-            }
-        }
-        requestAnimationFrame(resumeTick);
-    }
-    resumeTick();
-});
-
-function showEndScreen() {
+window.showEndScreen = function() {
     const modal = document.getElementById('modal');
     const title = document.getElementById('modalTitle');
     const body = document.getElementById('modalBody');
     const opts = document.getElementById('modalOptions');
-    if(!modal) return;
+    const contentBox = document.getElementById('modalContentBox');
+    
+    if(!modal || !contentBox) return;
     
     scanning = false;
     if (streamRef) streamRef.getTracks().forEach(track => track.stop());
     
+    // マップが画面に収まるようにモーダル自体の幅や高さを拡張
+    contentBox.style.width = '95%';
+    contentBox.style.maxWidth = '600px';
+    contentBox.style.maxHeight = '95vh';
+    contentBox.style.padding = '10px';
+    
     title.innerText = '訓練終了';
     title.style.color = 'var(--color-danger)';
-    title.style.fontSize = '40pt';
+    title.style.fontSize = '24pt';
     title.style.textAlign = 'center';
-    body.innerHTML = '<p style="text-align:center">30分が経過しました。</p>';
+    
+    body.innerHTML = `
+        <p style="text-align:center; font-size:14px; margin-bottom:10px;">30分経過または終了しました。</p>
+        <div id="mapContainer" style="width:100%; border:1px solid var(--color-border); background:#000; overflow:hidden;">
+            <canvas id="resultMapCanvas" style="display:block; width:100%; height:auto;"></canvas>
+        </div>
+        <p style="font-size:10px; color:#888; text-align:center; margin-top:5px;">※訪問履歴 (赤:EVENT, 緑:ITEM, 青:CHECK)</p>
+    `;
+    
     opts.innerHTML = '';
     modal.classList.remove('hidden');
-}
+
+    setTimeout(() => {
+        const canvas = document.getElementById('resultMapCanvas');
+        if(!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        img.onload = () => {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            
+            ctx.drawImage(img, 0, 0);
+            
+            // 訪問座標へピン（円）を描画する
+            visitedPoints.forEach(pt => {
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, 15, 0, 2 * Math.PI);
+                
+                if(pt.type === 'EVENT') ctx.fillStyle = 'rgba(226, 99, 99, 0.9)'; // 赤
+                else if(pt.type === 'ITEM') ctx.fillStyle = 'rgba(100, 168, 135, 0.9)'; // 緑
+                else ctx.fillStyle = 'rgba(75, 120, 168, 0.9)'; // 青
+                
+                ctx.fill();
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = '#fff';
+                ctx.stroke();
+            });
+        };
+        
+        img.onerror = () => {
+            document.getElementById('mapContainer').innerHTML = '<p style="color:var(--color-danger); text-align:center; padding:10px; background:#fff;">マップ画像 (map.bmp) が読み込めませんでした。<br>同じフォルダに map.bmp があるか確認してください。</p>';
+        };
+        
+        // ファイル名を明示的に指定
+        img.src = 'map.bmp';
+    }, 100);
+};

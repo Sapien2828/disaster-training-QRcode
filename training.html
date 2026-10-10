@@ -4,10 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>訓練画面</title>
-    <link rel="stylesheet" href="css/style.css">
-    <!-- jsQR CDN for lightweight QR reading -->
+    <!-- CSSキャッシュ対策としてパラメータを付与 -->
+    <link rel="stylesheet" href="css/style.css?v=2">
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-    <!-- PapaParse CDN for CSV parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
 </head>
 <body>
@@ -26,14 +25,12 @@
             <button id="restartCameraBtn" class="btn-primary" style="margin:0; display:none; background-color: var(--color-border);">カメラ再起動</button>
         </div>
         
-        <!-- 手動入力セクション -->
         <div id="manualInputSection" style="display:flex; gap:10px; justify-content:center; align-items:center;">
             <label for="manualCodeInput" style="margin:0; font-size:14px; white-space:nowrap;">手動入力:</label>
             <input type="text" id="manualCodeInput" placeholder="例: 0001" style="width: 100px; padding:8px;" inputmode="numeric" pattern="[0-9]*">
             <button id="manualCodeSubmitBtn" class="btn-primary" style="margin:0; min-height:40px; width:auto; padding:0 20px;">読込</button>
         </div>
         
-        <!-- デバッグ用強制終了ボタン（マップ確認用） -->
         <div style="text-align:right;">
             <button onclick="window.showEndScreen()" style="background:none; border:none; color:rgba(255,255,255,0.4); font-size:12px; width:auto; min-height:auto; margin:0; padding:0; text-decoration:underline;">強制終了してマップを確認</button>
         </div>
@@ -50,16 +47,16 @@
         </div>
     </div>
 
-    <!-- Modal for EVENT/ITEM/CHECK -->
     <div id="modal" class="modal hidden">
-        <div class="modal-content">
+        <div class="modal-content" id="modalContentBox">
             <h2 id="modalTitle"></h2>
             <div id="modalBody"></div>
             <div id="modalOptions" class="modal-options"></div>
         </div>
     </div>
 
-    <script src="js/api.js"></script>
-    <script src="js/app.js"></script>
+    <!-- JSキャッシュ対策としてパラメータを付与 -->
+    <script src="js/api.js?v=2"></script>
+    <script src="js/app.js?v=3"></script>
 </body>
 </html>
