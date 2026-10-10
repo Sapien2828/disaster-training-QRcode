@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>放射線科災害探索訓練アプリ - 開始画面</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>災害探索訓練 開始</h1>
+        <form id="startForm">
+            <div class="form-group">
+                <label for="participantId">参加者ID (半角英数字):</label>
+                <input type="text" id="participantId" required pattern="^[A-Za-z0-9]+$" maxlength="20" style="text-transform: uppercase;">
+            </div>
+            <div class="form-group">
+                <label for="attemptNo">訓練回数:</label>
+                <select id="attemptNo" required>
+                    <option value="1">初回</option>
+                    <option value="2">2回目</option>
+                    <option value="3">3回目</option>
+                    <option value="4">4回目</option>
+                    <option value="5">5回目</option>
+                    <option value="11">11回以上</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="difficulty">難易度:</label>
+                <select id="difficulty" required>
+                    <option value="初級">初級</option>
+                    <option value="中級">中級</option>
+                    <option value="上級">上級</option>
+                </select>
+            </div>
+            <div class="guidelines">
+                <h3>訓練上の諸注意</h3>
+                <ol>
+                    <li>院内は走らないでください。</li>
+                    <li>QRコードを読み取り、選択肢が表示された場合は選択してください。</li>
+                    <li>すべてのイベントに回答する必要はありません。優先順位を考え、保留して後回しにすることもできます。</li>
+                    <li>一度回答したイベントを変更する場合は、QRコードを再度読み取り、再回答してください。</li>
+                    <li>ITEMおよびCHECKのQRコードは、同一訓練セッション中に一度のみ読み取りできます。</li>
+                    <li>訓練時間は30分です。30分経過すると画面に訓練終了が表示されます。</li>
+                    <li>QRコードとITEMは訓練中に移動させないでください。</li>
+                </ol>
+            </div>
+            <button type="submit" class="btn-primary">訓練開始</button>
+        </form>
+    </div>
+    <script src="js/app.js"></script>
+</body>
+</html>

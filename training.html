@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>訓練画面</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- jsQR CDN for lightweight QR reading -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+</head>
+<body>
+    <div id="timeDisplay" class="time-display">00:00:00</div>
+    <div id="timerDisplay" class="timer-display">経過: 0分0秒</div>
+    
+    <div class="camera-section">
+        <video id="video" playsinline hidden></video>
+        <canvas id="canvas" hidden></canvas>
+        <div id="qrGuide" class="qr-guide">QR読み取りガイド</div>
+    </div>
+    
+    <div class="controls-section">
+        <button id="startCameraBtn" class="btn-primary">カメラ起動</button>
+    </div>
+
+    <div class="log-section">
+        <div class="log-left">
+            <h3>活動ログ</h3>
+            <ul id="activityLog"></ul>
+        </div>
+        <div class="log-right">
+            <h3>発見済みITEM</h3>
+            <ul id="foundItems"></ul>
+        </div>
+    </div>
+
+    <!-- Modal for EVENT/ITEM/CHECK -->
+    <div id="modal" class="modal hidden">
+        <div class="modal-content">
+            <h2 id="modalTitle"></h2>
+            <div id="modalBody"></div>
+            <div id="modalOptions" class="modal-options"></div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
