@@ -1,6 +1,6 @@
 // Handle GAS communication and offline logs
-const GAS_URL = https://script.google.com/macros/s/AKfycbzD2kOgmCwyG_jVItzW5e7OM54d2nA8JDr_Su-p6KfErkcR-VVRilVK1jFEMFLZ5Sb78w/exec
-
+// URLをシングルクォーテーションで囲んでいます。
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzD2kOgmCwyG_jVItzW5e7OM54d2nA8JDr_Su-p6KfErkcR-VVRilVK1jFEMFLZ5Sb78w/exec';
 
 async function sendLog(logData) {
     let queue = JSON.parse(localStorage.getItem('log_queue') || '[]');
