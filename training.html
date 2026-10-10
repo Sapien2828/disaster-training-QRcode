@@ -21,13 +21,21 @@
     </div>
     
     <div class="controls-section" style="display:flex; flex-direction:column; gap:10px; padding: 10px;">
-        <button id="startCameraBtn" class="btn-primary">カメラ起動</button>
+        <div style="display:flex; gap:10px; justify-content:center;">
+            <button id="startCameraBtn" class="btn-primary" style="margin:0;">カメラ起動</button>
+            <button id="restartCameraBtn" class="btn-primary" style="margin:0; display:none; background-color: var(--color-border);">カメラ再起動</button>
+        </div>
         
         <!-- 手動入力セクション -->
         <div id="manualInputSection" style="display:flex; gap:10px; justify-content:center; align-items:center;">
             <label for="manualCodeInput" style="margin:0; font-size:14px; white-space:nowrap;">手動入力:</label>
             <input type="text" id="manualCodeInput" placeholder="例: 0001" style="width: 100px; padding:8px;" inputmode="numeric" pattern="[0-9]*">
             <button id="manualCodeSubmitBtn" class="btn-primary" style="margin:0; min-height:40px; width:auto; padding:0 20px;">読込</button>
+        </div>
+        
+        <!-- デバッグ用強制終了ボタン（マップ確認用） -->
+        <div style="text-align:right;">
+            <button onclick="window.showEndScreen()" style="background:none; border:none; color:rgba(255,255,255,0.4); font-size:12px; width:auto; min-height:auto; margin:0; padding:0; text-decoration:underline;">強制終了してマップを確認</button>
         </div>
     </div>
 
