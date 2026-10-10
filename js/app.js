@@ -4,6 +4,7 @@ let streamRef = null;
 let masterData = []; 
 let currentEventRecord = null; 
 let visitedPoints = []; 
+let currentScannedAt = null; // スキャンした瞬間の時刻
 
 document.addEventListener('DOMContentLoaded', () => {
     const startForm = document.getElementById('startForm');
@@ -114,6 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             scanning = false; 
+            currentScannedAt = new Date(); // スキャン時刻の記録
             handleQRCodeScan(code);
             manualCodeInput.value = ""; 
             manualCodeInput.blur(); 
@@ -141,6 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (code) {
                 scanning = false; 
+                currentScannedAt = new Date(); // スキャン時刻の記録
                 handleQRCodeScan(code.data);
                 return; 
             }
@@ -233,11 +236,18 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         
+        const now = new Date();
+        const thinkingTimeSec = currentScannedAt ? Math.round((now.getTime() - currentScannedAt.getTime()) / 1000) : 0;
+
         const logData = {
             ...record,
             session_id: session.session_id,
             participant_id: session.participant_id,
-            timestamp: new Date().toISOString(),
+            difficulty: session.difficulty,
+            started_at: session.started_at,
+            timestamp: now.toISOString(),
+            scanned_at: currentScannedAt ? currentScannedAt.toISOString() : now.toISOString(),
+            thinking_time_sec: thinkingTimeSec,
             selected_option: optionData.text,
             option_score: optionData.score
         };
@@ -274,11 +284,20 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
+        const now = new Date();
+        const thinkingTimeSec = currentScannedAt ? Math.round((now.getTime() - currentScannedAt.getTime()) / 1000) : 0;
+
         const logData = {
             ...record,
             session_id: session.session_id,
             participant_id: session.participant_id,
-            timestamp: new Date().toISOString()
+            difficulty: session.difficulty,
+            started_at: session.started_at,
+            timestamp: now.toISOString(),
+            scanned_at: currentScannedAt ? currentScannedAt.toISOString() : now.toISOString(),
+            thinking_time_sec: thinkingTimeSec,
+            selected_option: '',
+            option_score: ''
         };
 
         if (typeof sendLog === 'function') sendLog(logData);
@@ -359,7 +378,6 @@ window.showEndScreen = function() {
     const itemCount = visitedPoints.filter(p => p.type === 'ITEM').length;
     const checkCount = visitedPoints.filter(p => p.type === 'CHECK').length;
 
-    // 凸包アルゴリズム (Monotone chain)
     function convexHull(points) {
         const unique = [];
         const seen = new Set();
@@ -415,22 +433,29 @@ window.showEndScreen = function() {
     title.style.textAlign = 'center';
     
     body.innerHTML = `
-        <p style="text-align:center; font-size:14px; margin-bottom:10px;">30分経過または終了しました。</p>
-        <div style="background:var(--color-surface-raised); padding:10px; border-radius:5px; margin-bottom:10px; font-size:14px; line-height:1.6;">
-            <strong>【訓練実績】</strong><br>
-            ・回答 EVENT : <span style="color:var(--color-danger); font-weight:bold;">${eventCount}</span> 件<br>
-            ・発見 ITEM : <span style="color:var(--color-success); font-weight:bold;">${itemCount}</span> 件<br>
-            ・確認 CHECK : <span style="color:var(--color-primary); font-weight:bold;">${checkCount}</span> 件<br>
-            <hr style="border-color:var(--color-border); margin:5px 0;">
-            ・空間カバー率 : <strong>${coverRate} %</strong><br>
-            <span style="font-size:11px; color:var(--color-text-muted);">
-            (探索面積: ${Math.round(hullArea).toLocaleString()} px&sup2; / 最大面積: ${MAX_AREA.toLocaleString()} px&sup2;)
-            </span>
+        <div id="captureArea" style="background:var(--color-bg); padding:10px; border-radius:5px;">
+            <p style="text-align:center; font-size:14px; margin-bottom:10px;">30分経過または終了しました。</p>
+            <div style="background:var(--color-surface-raised); padding:10px; border-radius:5px; margin-bottom:10px; font-size:14px; line-height:1.6;">
+                <strong>【訓練実績】</strong><br>
+                ・回答 EVENT : <span style="color:var(--color-danger); font-weight:bold;">${eventCount}</span> 件<br>
+                ・発見 ITEM : <span style="color:var(--color-success); font-weight:bold;">${itemCount}</span> 件<br>
+                ・確認 CHECK : <span style="color:var(--color-primary); font-weight:bold;">${checkCount}</span> 件<br>
+                <hr style="border-color:var(--color-border); margin:5px 0;">
+                ・空間カバー率 : <strong>${coverRate} %</strong><br>
+                <span style="font-size:11px; color:var(--color-text-muted);">
+                (探索面積: ${Math.round(hullArea).toLocaleString()} px&sup2; / 最大面積: ${MAX_AREA.toLocaleString()} px&sup2;)
+                </span>
+            </div>
+            <div id="mapContainer" style="width:100%; border:1px solid var(--color-border); background:#000; overflow:hidden; position:relative;">
+                <canvas id="resultMapCanvas" style="display:block; width:100%; height:auto;"></canvas>
+            </div>
+            <p style="font-size:10px; color:#888; text-align:center; margin-top:5px;">※訪問履歴 (赤:EVENT, 緑:ITEM, 青:CHECK)<br>黄色のエリアが靴紐公式で算出した探索範囲（凸包）です。</p>
         </div>
-        <div id="mapContainer" style="width:100%; border:1px solid var(--color-border); background:#000; overflow:hidden; position:relative;">
-            <canvas id="resultMapCanvas" style="display:block; width:100%; height:auto;"></canvas>
+        
+        <div style="margin-top: 15px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+            <button onclick="saveResultAsImage()" class="btn-primary" style="background:#4b78a8; min-height:40px; width:auto; padding:0 20px;">画像を保存</button>
+            <button onclick="shareResultImage()" class="btn-primary" style="background:#64a887; min-height:40px; width:auto; padding:0 20px;">共有する</button>
         </div>
-        <p style="font-size:10px; color:#888; text-align:center; margin-top:5px;">※訪問履歴 (赤:EVENT, 緑:ITEM, 青:CHECK)<br>黄色のエリアが靴紐公式で算出した探索範囲（凸包）です。</p>
     `;
     
     opts.innerHTML = '';
@@ -483,6 +508,45 @@ window.showEndScreen = function() {
             document.getElementById('mapContainer').innerHTML = '<p style="color:var(--color-danger); text-align:center; padding:10px; background:#fff;">マップ画像 (map.bmp または map.jpg) が読み込めませんでした。<br>同じフォルダに配置しているか確認してください。</p>';
         };
         
-        img.src = 'map.bmp'; // .bmp を読み込む想定
+        img.src = 'map.bmp';
     }, 100);
+};
+
+// --- 画像保存・共有用関数 ---
+window.saveResultAsImage = function() {
+    const content = document.getElementById('captureArea');
+    const session = JSON.parse(localStorage.getItem('disaster_training_session')) || {};
+    const pid = session.participant_id || 'Unknown';
+    
+    html2canvas(content, { useCORS: true, backgroundColor: '#071426' }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `Result_${pid}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    });
+};
+
+window.shareResultImage = async function() {
+    const content = document.getElementById('captureArea');
+    const session = JSON.parse(localStorage.getItem('disaster_training_session')) || {};
+    const pid = session.participant_id || 'Unknown';
+
+    html2canvas(content, { useCORS: true, backgroundColor: '#071426' }).then(async canvas => {
+        canvas.toBlob(async (blob) => {
+            const file = new File([blob], `Result_${pid}.png`, { type: 'image/png' });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: '災害訓練結果',
+                        text: `災害訓練アプリの実行結果です。(ID: ${pid})`
+                    });
+                } catch (error) {
+                    console.log('共有キャンセルまたはエラー', error);
+                }
+            } else {
+                alert('お使いのブラウザは画像の直接共有に対応していません。「画像を保存」してからメール等に添付してください。');
+            }
+        });
+    });
 };
