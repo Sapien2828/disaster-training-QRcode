@@ -20,8 +20,15 @@
         <div id="qrGuide" class="qr-guide">QR読み取りガイド</div>
     </div>
     
-    <div class="controls-section">
+    <div class="controls-section" style="display:flex; flex-direction:column; gap:10px; padding: 10px;">
         <button id="startCameraBtn" class="btn-primary">カメラ起動</button>
+        
+        <!-- 手動入力セクション -->
+        <div id="manualInputSection" style="display:flex; gap:10px; justify-content:center; align-items:center;">
+            <label for="manualCodeInput" style="margin:0; font-size:14px; white-space:nowrap;">手動入力:</label>
+            <input type="text" id="manualCodeInput" placeholder="例: 0001" style="width: 100px; padding:8px;" inputmode="numeric" pattern="[0-9]*">
+            <button id="manualCodeSubmitBtn" class="btn-primary" style="margin:0; min-height:40px; width:auto; padding:0 20px;">読込</button>
+        </div>
     </div>
 
     <div class="log-section">
@@ -41,7 +48,6 @@
             <h2 id="modalTitle"></h2>
             <div id="modalBody"></div>
             <div id="modalOptions" class="modal-options"></div>
-            <button onclick="closeModal()" class="btn-primary" style="margin-top:10px;">閉じる</button>
         </div>
     </div>
 
