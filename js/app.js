@@ -219,8 +219,6 @@ document.addEventListener('DOMContentLoaded', () => {
             optsContainer.appendChild(btnD);
         }
 
-        // ここで意図的にキャンセルボタンの描画処理を完全に除外しました
-
         showModal(titleText, bodyHtml);
     }
 
@@ -356,7 +354,56 @@ window.showEndScreen = function() {
     scanning = false;
     if (streamRef) streamRef.getTracks().forEach(track => track.stop());
     
-    // マップが画面に収まるようにモーダル自体の幅や高さを拡張
+    // 集計処理
+    const eventCount = visitedPoints.filter(p => p.type === 'EVENT').length;
+    const itemCount = visitedPoints.filter(p => p.type === 'ITEM').length;
+    const checkCount = visitedPoints.filter(p => p.type === 'CHECK').length;
+
+    // 凸包アルゴリズム (Monotone chain)
+    function convexHull(points) {
+        const unique = [];
+        const seen = new Set();
+        for(let p of points) {
+            const key = p.x + "," + p.y;
+            if(!seen.has(key)){
+                seen.add(key);
+                unique.push(p);
+            }
+        }
+        if (unique.length <= 3) return unique;
+        unique.sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+        const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+        const lower = [];
+        for (let p of unique) {
+            while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+            lower.push(p);
+        }
+        const upper = [];
+        for (let i = unique.length - 1; i >= 0; i--) {
+            let p = unique[i];
+            while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+            upper.push(p);
+        }
+        upper.pop(); lower.pop();
+        return lower.concat(upper);
+    }
+
+    function polygonArea(points) {
+        if(points.length < 3) return 0;
+        let area = 0;
+        for (let i = 0; i < points.length; i++) {
+            let j = (i + 1) % points.length;
+            area += points[i].x * points[j].y;
+            area -= points[j].x * points[i].y;
+        }
+        return Math.abs(area) / 2;
+    }
+
+    const hullPoints = convexHull(visitedPoints);
+    const hullArea = polygonArea(hullPoints);
+    const MAX_AREA = 544170; // 以前計算した最大訓練範囲 (Width 935 * Height 582)
+    const coverRate = ((hullArea / MAX_AREA) * 100).toFixed(1);
+
     contentBox.style.width = '95%';
     contentBox.style.maxWidth = '600px';
     contentBox.style.maxHeight = '95vh';
@@ -369,10 +416,21 @@ window.showEndScreen = function() {
     
     body.innerHTML = `
         <p style="text-align:center; font-size:14px; margin-bottom:10px;">30分経過または終了しました。</p>
-        <div id="mapContainer" style="width:100%; border:1px solid var(--color-border); background:#000; overflow:hidden;">
+        <div style="background:var(--color-surface-raised); padding:10px; border-radius:5px; margin-bottom:10px; font-size:14px; line-height:1.6;">
+            <strong>【訓練実績】</strong><br>
+            ・回答 EVENT : <span style="color:var(--color-danger); font-weight:bold;">${eventCount}</span> 件<br>
+            ・発見 ITEM : <span style="color:var(--color-success); font-weight:bold;">${itemCount}</span> 件<br>
+            ・確認 CHECK : <span style="color:var(--color-primary); font-weight:bold;">${checkCount}</span> 件<br>
+            <hr style="border-color:var(--color-border); margin:5px 0;">
+            ・空間カバー率 : <strong>${coverRate} %</strong><br>
+            <span style="font-size:11px; color:var(--color-text-muted);">
+            (探索面積: ${Math.round(hullArea).toLocaleString()} px&sup2; / 最大面積: ${MAX_AREA.toLocaleString()} px&sup2;)
+            </span>
+        </div>
+        <div id="mapContainer" style="width:100%; border:1px solid var(--color-border); background:#000; overflow:hidden; position:relative;">
             <canvas id="resultMapCanvas" style="display:block; width:100%; height:auto;"></canvas>
         </div>
-        <p style="font-size:10px; color:#888; text-align:center; margin-top:5px;">※訪問履歴 (赤:EVENT, 緑:ITEM, 青:CHECK)</p>
+        <p style="font-size:10px; color:#888; text-align:center; margin-top:5px;">※訪問履歴 (赤:EVENT, 緑:ITEM, 青:CHECK)<br>黄色のエリアが靴紐公式で算出した探索範囲（凸包）です。</p>
     `;
     
     opts.innerHTML = '';
@@ -390,14 +448,29 @@ window.showEndScreen = function() {
             
             ctx.drawImage(img, 0, 0);
             
+            // 凸包（カバーエリア）を描画
+            if(hullPoints.length > 0) {
+                ctx.beginPath();
+                ctx.moveTo(hullPoints[0].x, hullPoints[0].y);
+                for(let i=1; i<hullPoints.length; i++) {
+                    ctx.lineTo(hullPoints[i].x, hullPoints[i].y);
+                }
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(255, 255, 0, 0.2)'; 
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 255, 0, 0.6)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+            
             // 訪問座標へピン（円）を描画する
             visitedPoints.forEach(pt => {
                 ctx.beginPath();
                 ctx.arc(pt.x, pt.y, 15, 0, 2 * Math.PI);
                 
-                if(pt.type === 'EVENT') ctx.fillStyle = 'rgba(226, 99, 99, 0.9)'; // 赤
-                else if(pt.type === 'ITEM') ctx.fillStyle = 'rgba(100, 168, 135, 0.9)'; // 緑
-                else ctx.fillStyle = 'rgba(75, 120, 168, 0.9)'; // 青
+                if(pt.type === 'EVENT') ctx.fillStyle = 'rgba(226, 99, 99, 0.9)'; 
+                else if(pt.type === 'ITEM') ctx.fillStyle = 'rgba(100, 168, 135, 0.9)'; 
+                else ctx.fillStyle = 'rgba(75, 120, 168, 0.9)'; 
                 
                 ctx.fill();
                 ctx.lineWidth = 4;
@@ -407,10 +480,9 @@ window.showEndScreen = function() {
         };
         
         img.onerror = () => {
-            document.getElementById('mapContainer').innerHTML = '<p style="color:var(--color-danger); text-align:center; padding:10px; background:#fff;">マップ画像 (map.bmp) が読み込めませんでした。<br>同じフォルダに map.bmp があるか確認してください。</p>';
+            document.getElementById('mapContainer').innerHTML = '<p style="color:var(--color-danger); text-align:center; padding:10px; background:#fff;">マップ画像 (map.bmp または map.jpg) が読み込めませんでした。<br>同じフォルダに配置しているか確認してください。</p>';
         };
         
-        // ファイル名を明示的に指定
-        img.src = 'map.bmp';
+        img.src = 'map.bmp'; // .bmp を読み込む想定
     }, 100);
 };
