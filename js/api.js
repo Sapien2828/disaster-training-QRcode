@@ -1,5 +1,7 @@
 // Handle GAS communication and offline logs
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzD2kOgmCwyG_jVItzW5e7OM54d2nA8JDr_Su-p6KfErkcR-VVRilVK1jFEMFLZ5Sb78w/exec';
+
+// ★★★ ここに新しいGASウェブアプリのURLを貼り付けてください ★★★
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwarcCpmJAWOKAp8_Im80qWt5gxuURfoElMpPQdvM1z5HKci2WzP1C9BAhFHD-8xklC/exec';
 
 async function sendLog(logData) {
     let queue = JSON.parse(localStorage.getItem('log_queue') || '[]');
@@ -19,7 +21,6 @@ async function syncLogs() {
     
     for (let log of pending) {
         try {
-            // CORSエラー回避のため 'Content-Type': 'text/plain' に変更
             await fetch(GAS_URL, {
                 method: 'POST',
                 mode: 'no-cors',

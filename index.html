@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>放射線科災害探索訓練アプリ - 開始画面</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
     <div class="container">
@@ -45,9 +45,10 @@
                     <li>QRコードとITEMは訓練中に移動させないでください。</li>
                 </ol>
             </div>
+            <button type="button" onclick="localStorage.clear(); alert('端末の古い記録をリセットしました');" style="background:transparent; border:1px solid #e26363; color:#e26363; margin-bottom:10px;">(テスト用) 端末の古いデータをリセット</button>
             <button type="submit" class="btn-primary">訓練開始</button>
         </form>
     </div>
-    <script src="js/app.js"></script>
+    <script src="js/app.js?v=7"></script>
 </body>
 </html>

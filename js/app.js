@@ -4,7 +4,7 @@ let streamRef = null;
 let masterData = []; 
 let currentEventRecord = null; 
 let visitedPoints = []; 
-let currentScannedAt = null; // スキャンした瞬間の時刻
+let currentScannedAt = null; 
 
 document.addEventListener('DOMContentLoaded', () => {
     const startForm = document.getElementById('startForm');
@@ -115,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             scanning = false; 
-            currentScannedAt = new Date(); // スキャン時刻の記録
+            currentScannedAt = new Date(); 
             handleQRCodeScan(code);
             manualCodeInput.value = ""; 
             manualCodeInput.blur(); 
@@ -143,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (code) {
                 scanning = false; 
-                currentScannedAt = new Date(); // スキャン時刻の記録
+                currentScannedAt = new Date(); 
                 handleQRCodeScan(code.data);
                 return; 
             }
@@ -419,7 +419,7 @@ window.showEndScreen = function() {
 
     const hullPoints = convexHull(visitedPoints);
     const hullArea = polygonArea(hullPoints);
-    const MAX_AREA = 544170; // 以前計算した最大訓練範囲 (Width 935 * Height 582)
+    const MAX_AREA = 544170; // 最大訓練範囲
     const coverRate = ((hullArea / MAX_AREA) * 100).toFixed(1);
 
     contentBox.style.width = '95%';
@@ -473,7 +473,6 @@ window.showEndScreen = function() {
             
             ctx.drawImage(img, 0, 0);
             
-            // 凸包（カバーエリア）を描画
             if(hullPoints.length > 0) {
                 ctx.beginPath();
                 ctx.moveTo(hullPoints[0].x, hullPoints[0].y);
@@ -488,7 +487,6 @@ window.showEndScreen = function() {
                 ctx.stroke();
             }
             
-            // 訪問座標へピン（円）を描画する
             visitedPoints.forEach(pt => {
                 ctx.beginPath();
                 ctx.arc(pt.x, pt.y, 15, 0, 2 * Math.PI);
@@ -505,14 +503,13 @@ window.showEndScreen = function() {
         };
         
         img.onerror = () => {
-            document.getElementById('mapContainer').innerHTML = '<p style="color:var(--color-danger); text-align:center; padding:10px; background:#fff;">マップ画像 (map.bmp または map.jpg) が読み込めませんでした。<br>同じフォルダに配置しているか確認してください。</p>';
+            document.getElementById('mapContainer').innerHTML = '<p style="color:var(--color-danger); text-align:center; padding:10px; background:#fff;">マップ画像 (map.bmp) が読み込めませんでした。<br>同じフォルダに配置しているか確認してください。</p>';
         };
         
         img.src = 'map.bmp';
     }, 100);
 };
 
-// --- 画像保存・共有用関数 ---
 window.saveResultAsImage = function() {
     const content = document.getElementById('captureArea');
     const session = JSON.parse(localStorage.getItem('disaster_training_session')) || {};
