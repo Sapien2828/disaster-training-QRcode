@@ -1,5 +1,6 @@
 // Handle GAS communication and offline logs
-const GAS_URL = 'https://script.google.com/macros/library/d/1T8f-uEudhcDUcDUHdetjRHM3wfMYXFdud36rIUA_gWKHvJPjvv_U2W1L/6';
+// URLをシングルクォーテーションで囲んでいます。
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzJhXccZRAY0Z5hSH5Dgrd8a_eEXBW1NmXYVdqM2o0_yt1RC7nbKVNpZR1HUclZdVvM/exec';
 
 async function sendLog(logData) {
     let queue = JSON.parse(localStorage.getItem('log_queue') || '[]');
@@ -19,11 +20,10 @@ async function syncLogs() {
     
     for (let log of pending) {
         try {
-            // CORSエラー回避のため 'Content-Type': 'text/plain' に変更
             await fetch(GAS_URL, {
                 method: 'POST',
                 mode: 'no-cors',
-                headers: { 'Content-Type': 'text/plain' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(log)
             });
             log.status = 'SYNCED';
