@@ -36,12 +36,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (timeDisplay && session) {
         if (typeof Papa !== 'undefined') {
+            // ★変更点1：元の仕様通り「data/data.csv」を読み込むように戻しました。
             Papa.parse('data/data.csv', {
                 download: true,
                 header: true,
                 complete: function(results) {
                     masterData = results.data;
-                    console.log('CSV Loaded:', masterData.length, 'records.');
+                    console.log('CSV Loaded:', masterData.length, 'records from data.csv.');
                 }
             });
         }
@@ -90,7 +91,8 @@ document.addEventListener('DOMContentLoaded', () => {
             scanning = true;
             requestAnimationFrame(window.tick);
         }).catch(function(err) {
-            alert("カメラの起動に失敗しました。ブラウザのタブを一度閉じて開き直すか、権限設定を確認してください。\nエラー詳細: " + err);
+            alert("カメラの起動に失敗しました。ブラウザのタブを一度閉じて開き直すか、権限設定を確認してください。
+エラー詳細: " + err);
         });
     }
 
@@ -197,6 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const optsContainer = document.getElementById('modalOptions');
         optsContainer.innerHTML = ''; 
         
+        // CSVの列名（option_X_name, option_X_score, option_X_outcome 等）に合わせています
         const options = [
             { text: record.option_a_name, score: record.option_a_score, outcome: record.option_a_outcome },
             { text: record.option_b_name, score: record.option_b_score, outcome: record.option_b_outcome },
@@ -473,6 +476,7 @@ window.showEndScreen = function() {
             
             ctx.drawImage(img, 0, 0);
             
+            // 凸包（カバーエリア）を描画
             if(hullPoints.length > 0) {
                 ctx.beginPath();
                 ctx.moveTo(hullPoints[0].x, hullPoints[0].y);
@@ -487,13 +491,14 @@ window.showEndScreen = function() {
                 ctx.stroke();
             }
             
+            // 訪問座標へピン（円）を描画する
             visitedPoints.forEach(pt => {
                 ctx.beginPath();
                 ctx.arc(pt.x, pt.y, 15, 0, 2 * Math.PI);
                 
-                if(pt.type === 'EVENT') ctx.fillStyle = 'rgba(226, 99, 99, 0.9)'; 
-                else if(pt.type === 'ITEM') ctx.fillStyle = 'rgba(100, 168, 135, 0.9)'; 
-                else ctx.fillStyle = 'rgba(75, 120, 168, 0.9)'; 
+                if(pt.type === 'EVENT') ctx.fillStyle = 'rgba(226, 99, 99, 0.9)'; // 赤
+                else if(pt.type === 'ITEM') ctx.fillStyle = 'rgba(100, 168, 135, 0.9)'; // 緑
+                else ctx.fillStyle = 'rgba(75, 120, 168, 0.9)'; // 青
                 
                 ctx.fill();
                 ctx.lineWidth = 4;
@@ -503,13 +508,15 @@ window.showEndScreen = function() {
         };
         
         img.onerror = () => {
-            document.getElementById('mapContainer').innerHTML = '<p style="color:var(--color-danger); text-align:center; padding:10px; background:#fff;">マップ画像 (map.bmp) が読み込めませんでした。<br>同じフォルダに配置しているか確認してください。</p>';
+            document.getElementById('mapContainer').innerHTML = '<p style="color:var(--color-danger); text-align:center; padding:10px; background:#fff;">マップ画像 (map.bmp または map.jpg) が読み込めませんでした。<br>同じフォルダに配置しているか確認してください。</p>';
         };
         
+        // ファイル名を明示的に指定
         img.src = 'map.bmp';
     }, 100);
 };
 
+// --- 画像保存・共有用関数 ---
 window.saveResultAsImage = function() {
     const content = document.getElementById('captureArea');
     const session = JSON.parse(localStorage.getItem('disaster_training_session')) || {};

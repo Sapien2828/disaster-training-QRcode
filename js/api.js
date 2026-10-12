@@ -1,6 +1,5 @@
 // Handle GAS communication and offline logs
-
-// ★★★ ここに新しいGASウェブアプリのURLを貼り付けてください ★★★
+// URLは指定されたものを使用しています。
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwarcCpmJAWOKAp8_Im80qWt5gxuURfoElMpPQdvM1z5HKci2WzP1C9BAhFHD-8xklC/exec';
 
 async function sendLog(logData) {
