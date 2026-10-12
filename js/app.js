@@ -36,7 +36,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (timeDisplay && session) {
         if (typeof Papa !== 'undefined') {
-            // ★変更点1：元の仕様通り「data/data.csv」を読み込むように戻しました。
             Papa.parse('data/data.csv', {
                 download: true,
                 header: true,
@@ -91,8 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
             scanning = true;
             requestAnimationFrame(window.tick);
         }).catch(function(err) {
-            alert("カメラの起動に失敗しました。ブラウザのタブを一度閉じて開き直すか、権限設定を確認してください。
-エラー詳細: " + err);
+            alert("カメラの起動に失敗しました。ブラウザのタブを一度閉じて開き直すか、権限設定を確認してください。\nエラー詳細: " + err);
         });
     }
 
@@ -199,7 +197,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const optsContainer = document.getElementById('modalOptions');
         optsContainer.innerHTML = ''; 
         
-        // CSVの列名（option_X_name, option_X_score, option_X_outcome 等）に合わせています
         const options = [
             { text: record.option_a_name, score: record.option_a_score, outcome: record.option_a_outcome },
             { text: record.option_b_name, score: record.option_b_score, outcome: record.option_b_outcome },
@@ -422,7 +419,7 @@ window.showEndScreen = function() {
 
     const hullPoints = convexHull(visitedPoints);
     const hullArea = polygonArea(hullPoints);
-    const MAX_AREA = 544170; // 最大訓練範囲
+    const MAX_AREA = 544170; // 以前計算した最大訓練範囲
     const coverRate = ((hullArea / MAX_AREA) * 100).toFixed(1);
 
     contentBox.style.width = '95%';
@@ -496,9 +493,9 @@ window.showEndScreen = function() {
                 ctx.beginPath();
                 ctx.arc(pt.x, pt.y, 15, 0, 2 * Math.PI);
                 
-                if(pt.type === 'EVENT') ctx.fillStyle = 'rgba(226, 99, 99, 0.9)'; // 赤
-                else if(pt.type === 'ITEM') ctx.fillStyle = 'rgba(100, 168, 135, 0.9)'; // 緑
-                else ctx.fillStyle = 'rgba(75, 120, 168, 0.9)'; // 青
+                if(pt.type === 'EVENT') ctx.fillStyle = 'rgba(226, 99, 99, 0.9)'; 
+                else if(pt.type === 'ITEM') ctx.fillStyle = 'rgba(100, 168, 135, 0.9)'; 
+                else ctx.fillStyle = 'rgba(75, 120, 168, 0.9)'; 
                 
                 ctx.fill();
                 ctx.lineWidth = 4;
