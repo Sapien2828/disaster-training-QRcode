@@ -28,9 +28,9 @@ function doPost(e) {
       'Room_Name(部屋名)',        
       'Received_Time(受信時刻)',  
       'Record_Type', 
-      '4M_E_Category',             // 追加: 4M+E
-      'S_A_B_C_Eval',              // 追加: S/A/B/C評価
-      'Is_Hold(保留したか)',         // 追加: 保留フラグ
+      '4M_E_Category',             
+      'S_A_B_C_Eval',              
+      'Is_Hold(保留したか)',         
       'Log_ID', 
       'Selected_Option', 
       'Option_Score', 
@@ -51,8 +51,8 @@ function doPost(e) {
       data.location_name || '',                                           
       timeString,                                                         
       data.record_type || '',                                             
-      data.m4e_category || data['4M+E'] || '',                            // 4M+E を確実に取得
-      data.sabc_eval || data['S/A/B/C評価'] || '',                        // S/A/B/C評価を確実に取得
+      data.m4e_category || data['4M+E'] || '',                            
+      data.sabc_eval || data['S/A/B/C評価'] || '',                        
       isHold,                                                             
       data.log_id || '',                                                  
       data.selected_option || '',                                         

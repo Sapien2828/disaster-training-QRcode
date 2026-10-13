@@ -1,4 +1,4 @@
-// Main application logic - v22 Native Pie Chart + Robust GAS keys
+// Main application logic - v23 Robust Matching + Cache Bust
 let scanning = false;
 let streamRef = null;
 let masterData = []; 
@@ -36,7 +36,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (timeDisplay && session) {
         if (typeof Papa !== 'undefined') {
-            Papa.parse('data/data.csv', {
+            // キャッシュバスターを追加し、常に最新のCSVを読み込む
+            Papa.parse('data/data.csv?v=' + new Date().getTime(), {
                 download: true,
                 header: true,
                 complete: function(results) {
@@ -151,7 +152,6 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(window.tick);
     };
 
-    // 柔軟なキー取得
     function getSafeValue(record, possibleKeys) {
         if (!record) return '';
         for (let key in record) {
@@ -163,13 +163,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function handleQRCodeScan(scannedCode) {
-        const formattedCode = scannedCode.trim().padStart(4, '0');
+        const rawCode = scannedCode.trim();
+        const formattedCode = rawCode.padStart(4, '0');
+        const numCode = parseInt(rawCode, 10);
         const session = JSON.parse(localStorage.getItem('disaster_training_session'));
         
-        const matchedRecord = masterData.find(row => 
-            row.card_no === formattedCode && 
-            row.difficulty === session.difficulty
-        );
+        // 【最重要修正】card_noの形式違いによる「未登録コード」エラーを完全に防止する判定
+        const matchedRecord = masterData.find(row => {
+            const rowCardNo = row.card_no ? row.card_no.toString().trim() : "";
+            // CSV側が "1" でスキャンが "0001" でも一致するようにする
+            const isCardMatch = (rowCardNo === formattedCode || rowCardNo === rawCode || parseInt(rowCardNo, 10) === numCode);
+            const isDiffMatch = row.difficulty === session.difficulty;
+            return isCardMatch && isDiffMatch;
+        });
 
         if (matchedRecord) {
             const rType = (matchedRecord.record_type || '').trim().toUpperCase();
@@ -193,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
             closeBtn.onclick = window.closeModal;
             optsContainer.appendChild(closeBtn);
 
-            showModal("未登録コード", `入力されたコード（${formattedCode}）は未登録です。`);
+            showModal("未登録コード", `入力されたコード（${rawCode}）は未登録です。<br>難易度設定などを確認してください。`);
         }
     }
 
