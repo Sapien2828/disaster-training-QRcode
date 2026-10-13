@@ -1,4 +1,4 @@
-// Main application logic - v19 Clean & Triple Checked
+// Main application logic - v20 Clean & Triple Checked
 let scanning = false;
 let streamRef = null;
 let masterData = []; 
@@ -155,14 +155,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const formattedCode = scannedCode.trim().padStart(4, '0');
         const session = JSON.parse(localStorage.getItem('disaster_training_session'));
         
-        // Find matching record by card_no (A列) and difficulty (C列)
         const matchedRecord = masterData.find(row => 
             row.card_no === formattedCode && 
             row.difficulty === session.difficulty
         );
 
         if (matchedRecord) {
-            // Check record_type or event_stage (K列)
             const rType = (matchedRecord.record_type || '').trim().toUpperCase();
             const stage = (matchedRecord.event_stage || '').trim();
             
