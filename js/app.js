@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const s = diffSec % 60;
             timerDisplay.innerText = `経過: ${m}分${s}秒`;
             
-            if (m >= 30 && document.getElementById('modalTitle') && document.getElementById('modalTitle').innerText !== '訓練終了') {
+            if (m >= 30 && document.getElementById('modalTitle') && document.getElementById('modalTitle'].innerText !== '訓練終了') {
                 window.showEndScreen();
             }
         }, 1000);
@@ -155,19 +155,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const formattedCode = scannedCode.trim().padStart(4, '0');
         const session = JSON.parse(localStorage.getItem('disaster_training_session'));
         
+        // Find matching record by card_no (A列) and difficulty (C列)
         const matchedRecord = masterData.find(row => 
             row.card_no === formattedCode && 
-            row.difficulty === session.difficulty &&
-            row.active === 'TRUE'
+            row.difficulty === session.difficulty
         );
 
         if (matchedRecord) {
-            if (matchedRecord.record_type === 'EVENT') {
+            // Check if it's an EVENT (has event_stage in K column or event_id in J column)
+            if (matchedRecord.event_stage && matchedRecord.event_stage.trim() !== '') {
                 showEventModal(matchedRecord);
-            } else if (matchedRecord.record_type === 'ITEM' || matchedRecord.record_type === 'CHECK') {
-                showItemCheckModal(matchedRecord, matchedRecord.record_type);
+            } else if (matchedRecord.item_name && matchedRecord.item_name.trim() !== '') {
+                showItemCheckModal(matchedRecord, 'ITEM');
+            } else if (matchedRecord.check_name && matchedRecord.check_name.trim() !== '') {
+                showItemCheckModal(matchedRecord, 'CHECK');
             } else {
-                showModal("エラー", "不正なレコードタイプです。");
+                showModal("エラー", "有効なイベントまたはアイテム情報が見つかりません。");
             }
         } else {
             const optsContainer = document.getElementById('modalOptions');
@@ -185,22 +188,23 @@ document.addEventListener('DOMContentLoaded', () => {
     function showEventModal(record) {
         currentEventRecord = record;
         
-        const titleText = `【EVENT】${record.location_name}`;
+        const titleText = `【EVENT】${record.location_name || ''}`;
         const bodyHtml = `
             <div style="text-align: center; margin-bottom: 10px;">
-                <p style="color:var(--color-danger); font-weight:bold; font-size: 1.2em;">${record.event_name}</p>
+                <p style="color:var(--color-danger); font-weight:bold; font-size: 1.2em;">${record.event_name || ''}</p>
             </div>
-            <p>${record.event_body}</p>
+            <p>${record.event_body || ''}</p>
             <p style="font-size: 0.8em; color: var(--color-text-muted);">※選択肢を選んでください。</p>
         `;
         
         const optsContainer = document.getElementById('modalOptions');
         optsContainer.innerHTML = ''; 
         
+        // Options from V, Z, AD, AH (Option names) and scores from W, AA, AE, AI (or total scores X, AB, AF, AJ)
         const options = [
-            { text: record.option_a_name, score: record.option_a_score, outcome: record.option_a_outcome },
-            { text: record.option_b_name, score: record.option_b_score, outcome: record.option_b_outcome },
-            { text: record.option_c_name, score: record.option_c_score, outcome: record.option_c_outcome }
+            { text: record.option_a_name, score: record.option_a_score || record.option_a_total_score, outcome: record.option_a_outcome },
+            { text: record.option_b_name, score: record.option_b_score || record.option_b_total_score, outcome: record.option_b_outcome },
+            { text: record.option_c_name, score: record.option_c_score || record.option_c_total_score, outcome: record.option_c_outcome }
         ];
 
         options.forEach((opt, index) => {
@@ -218,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btnD.className = 'btn-primary';
             btnD.style.backgroundColor = 'var(--color-surface-raised)'; 
             btnD.innerText = record.option_d_name;
-            btnD.onclick = () => handleEventAnswer(4, { text: record.option_d_name, score: record.option_d_score, outcome: record.option_d_outcome });
+            btnD.onclick = () => handleEventAnswer(4, { text: record.option_d_name, score: record.option_d_score || record.option_d_total_score, outcome: record.option_d_outcome });
             optsContainer.appendChild(btnD);
         }
 
@@ -229,10 +233,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const record = currentEventRecord;
         const session = JSON.parse(localStorage.getItem('disaster_training_session'));
         
+        // After answering, display outcome and scores (AA, AE, AI, AM etc.)
         const resultBody = `
             <p style="font-weight:bold; color:var(--color-primary);">選択: ${optionData.text}</p>
             <div style="background:var(--color-surface-raised); padding:10px; margin-top:10px; border-radius:5px;">
-                <p><strong>【結果】</strong><br>${optionData.outcome}</p>
+                <p><strong>【結果】</strong><br>${optionData.outcome || '記録しました。'}</p>
+                <p style="margin-top:5px; font-size:0.9em; color:var(--color-success);">獲得スコア: ${optionData.score !== undefined ? optionData.score : 0}</p>
             </div>
         `;
         
@@ -256,7 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addLogToScreen(logData);
 
         if (record.x_px && record.y_px) {
-            visitedPoints.push({ x: parseFloat(record.x_px), y: parseFloat(record.y_px), type: record.record_type });
+            visitedPoints.push({ x: parseFloat(record.x_px), y: parseFloat(record.y_px), type: 'EVENT' });
         }
 
         const optsContainer = document.getElementById('modalOptions');
@@ -275,12 +281,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const session = JSON.parse(localStorage.getItem('disaster_training_session'));
         const isItem = type === 'ITEM';
         const titleText = isItem ? `【ITEM発見】` : `【CHECK完了】`;
-        const itemName = isItem ? record.item_name : record.check_name;
+        
+        // If K column is empty, show S (check_name/item_name). If still empty, show U (weight/score).
+        let displayName = '';
+        if (isItem) {
+            displayName = record.item_name || record.check_name || record.S/A/B/C重みづけ係数 || '不明なアイテム';
+        } else {
+            displayName = record.check_name || record.item_name || record['S/A/B/C重みづけ係数'] || record.Item_score || '不明なチェック項目';
+        }
         
         const bodyHtml = `
             <div style="text-align: center; margin: 20px 0;">
-                <p style="font-size: 1.5em; font-weight: bold; color: var(--color-success);">${itemName}</p>
-                <p>場所: ${record.location_name}</p>
+                <p style="font-size: 1.5em; font-weight: bold; color: var(--color-success);">${displayName}</p>
+                <p>場所: ${record.location_name || ''}</p>
             </div>
         `;
 
@@ -289,6 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const logData = {
             ...record,
+            record_type: type,
             session_id: session.session_id,
             participant_id: session.participant_id,
             difficulty: session.difficulty,
@@ -296,15 +310,15 @@ document.addEventListener('DOMContentLoaded', () => {
             timestamp: now.toISOString(),
             scanned_at: currentScannedAt ? currentScannedAt.toISOString() : now.toISOString(),
             thinking_time_sec: thinkingTimeSec,
-            selected_option: '',
-            option_score: ''
+            selected_option: displayName,
+            option_score: record.Item_score || record.CHECK_score || record['S/A/B/C重みづけ係数'] || ''
         };
 
         if (typeof sendLog === 'function') sendLog(logData);
         addLogToScreen(logData);
 
         if (record.x_px && record.y_px) {
-            visitedPoints.push({ x: parseFloat(record.x_px), y: parseFloat(record.y_px), type: record.record_type });
+            visitedPoints.push({ x: parseFloat(record.x_px), y: parseFloat(record.y_px), type: type });
         }
 
         const optsContainer = document.getElementById('modalOptions');
@@ -328,8 +342,8 @@ function addLogToScreen(record) {
         const li = document.createElement('li');
         let name = "";
         if(record.record_type === 'EVENT') name = `${record.event_name} (${record.selected_option})`;
-        else if(record.record_type === 'ITEM') name = record.item_name;
-        else if(record.record_type === 'CHECK') name = record.check_name;
+        else if(record.record_type === 'ITEM') name = record.item_name || record.check_name;
+        else if(record.record_type === 'CHECK') name = record.check_name || record.item_name;
         
         li.innerHTML = `<span>[${timeStr}]</span> <span style="color:var(--color-primary)">${record.record_type}</span>: ${name}`;
         activityLog.prepend(li);
@@ -337,7 +351,7 @@ function addLogToScreen(record) {
     
     if (foundItems && record.record_type === 'ITEM') {
         const li = document.createElement('li');
-        li.innerHTML = `<span>[${timeStr}]</span> ${record.item_name}`;
+        li.innerHTML = `<span>[${timeStr}]</span> ${record.item_name || record.check_name}`;
         foundItems.prepend(li);
     }
 }
@@ -373,7 +387,6 @@ window.showEndScreen = function() {
     scanning = false;
     if (streamRef) streamRef.getTracks().forEach(track => track.stop());
     
-    // 集計処理
     const eventCount = visitedPoints.filter(p => p.type === 'EVENT').length;
     const itemCount = visitedPoints.filter(p => p.type === 'ITEM').length;
     const checkCount = visitedPoints.filter(p => p.type === 'CHECK').length;
@@ -419,7 +432,7 @@ window.showEndScreen = function() {
 
     const hullPoints = convexHull(visitedPoints);
     const hullArea = polygonArea(hullPoints);
-    const MAX_AREA = 544170; // 以前計算した最大訓練範囲
+    const MAX_AREA = 544170; 
     const coverRate = ((hullArea / MAX_AREA) * 100).toFixed(1);
 
     contentBox.style.width = '95%';
@@ -473,7 +486,6 @@ window.showEndScreen = function() {
             
             ctx.drawImage(img, 0, 0);
             
-            // 凸包（カバーエリア）を描画
             if(hullPoints.length > 0) {
                 ctx.beginPath();
                 ctx.moveTo(hullPoints[0].x, hullPoints[0].y);
@@ -488,7 +500,6 @@ window.showEndScreen = function() {
                 ctx.stroke();
             }
             
-            // 訪問座標へピン（円）を描画する
             visitedPoints.forEach(pt => {
                 ctx.beginPath();
                 ctx.arc(pt.x, pt.y, 15, 0, 2 * Math.PI);
@@ -505,15 +516,13 @@ window.showEndScreen = function() {
         };
         
         img.onerror = () => {
-            document.getElementById('mapContainer').innerHTML = '<p style="color:var(--color-danger); text-align:center; padding:10px; background:#fff;">マップ画像 (map.bmp または map.jpg) が読み込めませんでした。<br>同じフォルダに配置しているか確認してください。</p>';
+            document.getElementById('mapContainer').innerHTML = '<p style="color:var(--color-danger); text-align:center; padding:10px; background:#fff;">マップ画像 (map.bmp) が読み込めませんでした。<br>同じフォルダに配置しているか確認してください。</p>';
         };
         
-        // ファイル名を明示的に指定
         img.src = 'map.bmp';
     }, 100);
 };
 
-// --- 画像保存・共有用関数 ---
 window.saveResultAsImage = function() {
     const content = document.getElementById('captureArea');
     const session = JSON.parse(localStorage.getItem('disaster_training_session')) || {};
