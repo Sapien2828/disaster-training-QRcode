@@ -1,4 +1,4 @@
-// Main application logic - v20 Clean & Triple Checked
+// Main application logic - v21 with 4M+E Radar Chart
 let scanning = false;
 let streamRef = null;
 let masterData = []; 
@@ -261,7 +261,12 @@ document.addEventListener('DOMContentLoaded', () => {
         addLogToScreen(logData);
 
         if (record.x_px && record.y_px) {
-            visitedPoints.push({ x: parseFloat(record.x_px), y: parseFloat(record.y_px), type: 'EVENT' });
+            visitedPoints.push({ 
+                x: parseFloat(record.x_px), 
+                y: parseFloat(record.y_px), 
+                type: 'EVENT',
+                m4e: record['4M+E'] || 'Unknown'
+            });
         }
 
         const optsContainer = document.getElementById('modalOptions');
@@ -389,6 +394,20 @@ window.showEndScreen = function() {
     const itemCount = visitedPoints.filter(p => p.type === 'ITEM').length;
     const checkCount = visitedPoints.filter(p => p.type === 'CHECK').length;
 
+    // 4M+E Analysis
+    const session = JSON.parse(localStorage.getItem('disaster_training_session'));
+    const totalM4E = { 'Man':0, 'Machine':0, 'Material':0, 'Method':0, 'Environment':0 };
+    masterData.filter(r => (r.record_type||'').toUpperCase() === 'EVENT' && r.difficulty === session.difficulty && r.active === 'TRUE').forEach(r => {
+        const cat = r['4M+E'] || 'Environment';
+        if(totalM4E[cat] !== undefined) totalM4E[cat]++;
+    });
+
+    const userM4E = { 'Man':0, 'Machine':0, 'Material':0, 'Method':0, 'Environment':0 };
+    visitedPoints.filter(p => p.type === 'EVENT').forEach(p => {
+        const cat = p.m4e || 'Environment';
+        if(userM4E[cat] !== undefined) userM4E[cat]++;
+    });
+
     function convexHull(points) {
         const unique = [];
         const seen = new Set();
@@ -453,14 +472,19 @@ window.showEndScreen = function() {
                 ・確認 CHECK : <span style="color:var(--color-primary); font-weight:bold;">${checkCount}</span> 件<br>
                 <hr style="border-color:var(--color-border); margin:5px 0;">
                 ・空間カバー率 : <strong>${coverRate} %</strong><br>
-                <span style="font-size:11px; color:var(--color-text-muted);">
-                (探索面積: ${Math.round(hullArea).toLocaleString()} px&sup2; / 最大面積: ${MAX_AREA.toLocaleString()} px&sup2;)
-                </span>
             </div>
+            
+            <div style="background:var(--color-surface-raised); padding:10px; border-radius:5px; margin-bottom:10px;">
+                <h4 style="text-align:center; margin:0 0 10px 0; color:var(--color-text);">イベント対応分析 (4M+E)</h4>
+                <div style="width: 100%; max-width: 300px; margin: 0 auto;">
+                    <canvas id="m4eChart"></canvas>
+                </div>
+                <p style="font-size:10px; color:var(--color-text-muted); text-align:center; margin-top:5px;">青破線: 発生した全イベント / 緑実線: あなたの対応数<br>どの要素が足りていないか確認しましょう</p>
+            </div>
+
             <div id="mapContainer" style="width:100%; border:1px solid var(--color-border); background:#000; overflow:hidden; position:relative;">
                 <canvas id="resultMapCanvas" style="display:block; width:100%; height:auto;"></canvas>
             </div>
-            <p style="font-size:10px; color:#888; text-align:center; margin-top:5px;">※訪問履歴 (赤:EVENT, 緑:ITEM, 青:CHECK)<br>黄色のエリアが靴紐公式で算出した探索範囲（凸包）です。</p>
         </div>
         
         <div style="margin-top: 15px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
@@ -473,6 +497,51 @@ window.showEndScreen = function() {
     modal.classList.remove('hidden');
 
     setTimeout(() => {
+        // Draw Chart
+        const ctxChart = document.getElementById('m4eChart');
+        if (ctxChart && typeof Chart !== 'undefined') {
+            new Chart(ctxChart, {
+                type: 'radar',
+                data: {
+                    labels: ['Man(人)', 'Machine(機器)', 'Material(物資)', 'Method(手順)', 'Environment(環境)'],
+                    datasets: [
+                        {
+                            label: 'あなたの対応数',
+                            data: [userM4E['Man'], userM4E['Machine'], userM4E['Material'], userM4E['Method'], userM4E['Environment']],
+                            backgroundColor: 'rgba(100, 168, 135, 0.4)',
+                            borderColor: 'rgba(100, 168, 135, 1)',
+                            pointBackgroundColor: 'rgba(100, 168, 135, 1)',
+                            borderWidth: 2
+                        },
+                        {
+                            label: '全体イベント数',
+                            data: [totalM4E['Man'], totalM4E['Machine'], totalM4E['Material'], totalM4E['Method'], totalM4E['Environment']],
+                            backgroundColor: 'rgba(75, 120, 168, 0.1)',
+                            borderColor: 'rgba(75, 120, 168, 0.5)',
+                            borderWidth: 1,
+                            borderDash: [5, 5]
+                        }
+                    ]
+                },
+                options: {
+                    animation: false, // Ensure it's fully rendered for html2canvas
+                    responsive: true,
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1, color: '#b8c5d6', backdropColor: 'transparent' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            pointLabels: { color: '#e8eef7', font: { size: 10 } }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#e8eef7', font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        // Draw Map
         const canvas = document.getElementById('resultMapCanvas');
         if(!canvas) return;
         const ctx = canvas.getContext('2d');

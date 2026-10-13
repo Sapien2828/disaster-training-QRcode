@@ -9,6 +9,11 @@ function doPost(e) {
     const seconds = String(now.getSeconds()).padStart(2, '0');
     const timeString = `${hours}:${minutes}:${seconds}`;
     
+    let isHold = 'No';
+    if (data.selected_option && data.selected_option.includes('保留')) {
+        isHold = 'Yes';
+    }
+    
     const headers = [
       'Timestamp(記録日)', 
       'Participant_ID', 
@@ -20,9 +25,12 @@ function doPost(e) {
       'Thinking_Time_Sec(試行時間)', 
       'X_px', 
       'Y_px', 
-      'Room_Name(部屋名)',        // J列 / K列付近
-      'Received_Time(受信時刻)',  // タイムスタンプ HH:MM:SS
+      'Room_Name(部屋名)',        
+      'Received_Time(受信時刻)',  
       'Record_Type', 
+      '4M_E_Category',             // 追加: 4M+E
+      'S_A_B_C_Eval',              // 追加: S/A/B/C評価
+      'Is_Hold(保留したか)',         // 追加: 保留フラグ
       'Log_ID', 
       'Selected_Option', 
       'Option_Score', 
@@ -40,9 +48,12 @@ function doPost(e) {
       data.thinking_time_sec !== undefined ? data.thinking_time_sec : '', 
       data.x_px || '',                                        
       data.y_px || '',                                        
-      data.location_name || '',                                           // 部屋名
-      timeString,                                                         // 受信時刻 (HH:MM:SS)
+      data.location_name || '',                                           
+      timeString,                                                         
       data.record_type || '',                                             
+      data['4M+E'] || '',                                                 // 4M+E
+      data['S/A/B/C評価'] || '',                                          // S/A/B/C評価
+      isHold,                                                             // 保留判定
       data.log_id || '',                                                  
       data.selected_option || '',                                         
       data.option_score !== undefined ? data.option_score : '',           
