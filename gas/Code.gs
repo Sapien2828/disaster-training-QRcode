@@ -51,9 +51,9 @@ function doPost(e) {
       data.location_name || '',                                           
       timeString,                                                         
       data.record_type || '',                                             
-      data['4M+E'] || '',                                                 // 4M+E
-      data['S/A/B/C評価'] || '',                                          // S/A/B/C評価
-      isHold,                                                             // 保留判定
+      data.m4e_category || data['4M+E'] || '',                            // 4M+E を確実に取得
+      data.sabc_eval || data['S/A/B/C評価'] || '',                        // S/A/B/C評価を確実に取得
+      isHold,                                                             
       data.log_id || '',                                                  
       data.selected_option || '',                                         
       data.option_score !== undefined ? data.option_score : '',           

@@ -1,4 +1,4 @@
-// Main application logic - v21 with 4M+E Radar Chart
+// Main application logic - v22 Native Pie Chart + Robust GAS keys
 let scanning = false;
 let streamRef = null;
 let masterData = []; 
@@ -150,6 +150,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         requestAnimationFrame(window.tick);
     };
+
+    // 柔軟なキー取得
+    function getSafeValue(record, possibleKeys) {
+        if (!record) return '';
+        for (let key in record) {
+            for (let pk of possibleKeys) {
+                if (key.includes(pk)) return record[key];
+            }
+        }
+        return '';
+    }
     
     function handleQRCodeScan(scannedCode) {
         const formattedCode = scannedCode.trim().padStart(4, '0');
@@ -244,6 +255,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const now = new Date();
         const thinkingTimeSec = currentScannedAt ? Math.round((now.getTime() - currentScannedAt.getTime()) / 1000) : 0;
 
+        const m4eVal = getSafeValue(record, ['4M+E', '4M', '4m', 'm4e']);
+        const sabcVal = getSafeValue(record, ['S/A/B/C評価', '評価', 'eval']);
+
         const logData = {
             ...record,
             session_id: session.session_id,
@@ -254,7 +268,9 @@ document.addEventListener('DOMContentLoaded', () => {
             scanned_at: currentScannedAt ? currentScannedAt.toISOString() : now.toISOString(),
             thinking_time_sec: thinkingTimeSec,
             selected_option: optionData.text,
-            option_score: optionData.score
+            option_score: optionData.score,
+            m4e_category: m4eVal,
+            sabc_eval: sabcVal
         };
         
         if (typeof sendLog === 'function') sendLog(logData);
@@ -265,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 x: parseFloat(record.x_px), 
                 y: parseFloat(record.y_px), 
                 type: 'EVENT',
-                m4e: record['4M+E'] || 'Unknown'
+                m4e: m4eVal || 'Environment'
             });
         }
 
@@ -302,6 +318,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const now = new Date();
         const thinkingTimeSec = currentScannedAt ? Math.round((now.getTime() - currentScannedAt.getTime()) / 1000) : 0;
+        
+        const m4eVal = getSafeValue(record, ['4M+E', '4M', '4m', 'm4e']);
+        const sabcVal = getSafeValue(record, ['S/A/B/C評価', '評価', 'eval']);
 
         const logData = {
             ...record,
@@ -314,7 +333,9 @@ document.addEventListener('DOMContentLoaded', () => {
             scanned_at: currentScannedAt ? currentScannedAt.toISOString() : now.toISOString(),
             thinking_time_sec: thinkingTimeSec,
             selected_option: displayName,
-            option_score: record.Item_score || record.CHECK_score || ''
+            option_score: record.Item_score || record.CHECK_score || '',
+            m4e_category: m4eVal,
+            sabc_eval: sabcVal
         };
 
         if (typeof sendLog === 'function') sendLog(logData);
@@ -395,16 +416,15 @@ window.showEndScreen = function() {
     const checkCount = visitedPoints.filter(p => p.type === 'CHECK').length;
 
     // 4M+E Analysis
-    const session = JSON.parse(localStorage.getItem('disaster_training_session'));
-    const totalM4E = { 'Man':0, 'Machine':0, 'Material':0, 'Method':0, 'Environment':0 };
-    masterData.filter(r => (r.record_type||'').toUpperCase() === 'EVENT' && r.difficulty === session.difficulty && r.active === 'TRUE').forEach(r => {
-        const cat = r['4M+E'] || 'Environment';
-        if(totalM4E[cat] !== undefined) totalM4E[cat]++;
-    });
-
     const userM4E = { 'Man':0, 'Machine':0, 'Material':0, 'Method':0, 'Environment':0 };
     visitedPoints.filter(p => p.type === 'EVENT').forEach(p => {
-        const cat = p.m4e || 'Environment';
+        let cat = (p.m4e || '').trim();
+        // Fallback for exact matching
+        if(cat.includes('Man')) cat = 'Man';
+        else if(cat.includes('Machine')) cat = 'Machine';
+        else if(cat.includes('Material')) cat = 'Material';
+        else if(cat.includes('Method')) cat = 'Method';
+        else cat = 'Environment';
         if(userM4E[cat] !== undefined) userM4E[cat]++;
     });
 
@@ -475,16 +495,15 @@ window.showEndScreen = function() {
             </div>
             
             <div style="background:var(--color-surface-raised); padding:10px; border-radius:5px; margin-bottom:10px;">
-                <h4 style="text-align:center; margin:0 0 10px 0; color:var(--color-text);">イベント対応分析 (4M+E)</h4>
-                <div style="width: 100%; max-width: 300px; margin: 0 auto;">
-                    <canvas id="m4eChart"></canvas>
-                </div>
-                <p style="font-size:10px; color:var(--color-text-muted); text-align:center; margin-top:5px;">青破線: 発生した全イベント / 緑実線: あなたの対応数<br>どの要素が足りていないか確認しましょう</p>
+                <h4 style="text-align:center; margin:0 0 10px 0; color:var(--color-text);">あなたが対応したイベント (4M+E割合)</h4>
+                <canvas id="m4ePieChart" width="300" height="200" style="margin: 0 auto; display: block;"></canvas>
+                <p style="font-size:10px; color:var(--color-text-muted); text-align:center; margin-top:5px;">あなたの行動に偏りがないか確認しましょう。<br>(割合が少ない要素は見落としている可能性があります)</p>
             </div>
 
             <div id="mapContainer" style="width:100%; border:1px solid var(--color-border); background:#000; overflow:hidden; position:relative;">
                 <canvas id="resultMapCanvas" style="display:block; width:100%; height:auto;"></canvas>
             </div>
+            <p style="font-size:10px; color:#888; text-align:center; margin-top:5px;">※訪問履歴 (赤:EVENT, 緑:ITEM, 青:CHECK)<br>黄色のエリアが靴紐公式で算出した探索範囲（凸包）です。</p>
         </div>
         
         <div style="margin-top: 15px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
@@ -497,88 +516,138 @@ window.showEndScreen = function() {
     modal.classList.remove('hidden');
 
     setTimeout(() => {
-        // Draw Chart
-        const ctxChart = document.getElementById('m4eChart');
-        if (ctxChart && typeof Chart !== 'undefined') {
-            new Chart(ctxChart, {
-                type: 'radar',
-                data: {
-                    labels: ['Man(人)', 'Machine(機器)', 'Material(物資)', 'Method(手順)', 'Environment(環境)'],
-                    datasets: [
-                        {
-                            label: 'あなたの対応数',
-                            data: [userM4E['Man'], userM4E['Machine'], userM4E['Material'], userM4E['Method'], userM4E['Environment']],
-                            backgroundColor: 'rgba(100, 168, 135, 0.4)',
-                            borderColor: 'rgba(100, 168, 135, 1)',
-                            pointBackgroundColor: 'rgba(100, 168, 135, 1)',
-                            borderWidth: 2
-                        },
-                        {
-                            label: '全体イベント数',
-                            data: [totalM4E['Man'], totalM4E['Machine'], totalM4E['Material'], totalM4E['Method'], totalM4E['Environment']],
-                            backgroundColor: 'rgba(75, 120, 168, 0.1)',
-                            borderColor: 'rgba(75, 120, 168, 0.5)',
-                            borderWidth: 1,
-                            borderDash: [5, 5]
-                        }
-                    ]
-                },
-                options: {
-                    animation: false, // Ensure it's fully rendered for html2canvas
-                    responsive: true,
-                    scales: {
-                        r: {
-                            beginAtZero: true,
-                            ticks: { stepSize: 1, color: '#b8c5d6', backdropColor: 'transparent' },
-                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                            pointLabels: { color: '#e8eef7', font: { size: 10 } }
-                        }
-                    },
-                    plugins: {
-                        legend: { labels: { color: '#e8eef7', font: { size: 10 } } }
-                    }
-                }
-            });
+        // Native Canvas Pie Chart (No external libraries required)
+        function drawPieChart(canvasId, dataObj) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            const centerX = width / 2 + 30; // Shift right for legend
+            const centerY = height / 2;
+            const radius = Math.min(centerX, centerY) - 20;
+
+            const colors = {
+                'Man': '#ff6384',
+                'Machine': '#36a2eb',
+                'Material': '#ffce56',
+                'Method': '#4bc0c0',
+                'Environment': '#9966ff'
+            };
+            const labels = {
+                'Man': '人(Man)',
+                'Machine': '機器(Machine)',
+                'Material': '物資(Material)',
+                'Method': '手順(Method)',
+                'Environment': '環境(Env)'
+            };
+
+            let total = 0;
+            for (let key in dataObj) total += dataObj[key];
+
+            ctx.clearRect(0, 0, width, height);
+
+            if (total === 0) {
+                ctx.fillStyle = '#b8c5d6';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = '12px sans-serif';
+                ctx.fillText('イベント対応データがありません', centerX, centerY);
+                return;
+            }
+
+            let currentAngle = -Math.PI / 2;
+            
+            // Draw Pie
+            for (let key in dataObj) {
+                const count = dataObj[key];
+                if (count === 0) continue;
+                
+                const sliceAngle = (count / total) * 2 * Math.PI;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
+                ctx.closePath();
+                ctx.fillStyle = colors[key] || '#999';
+                ctx.fill();
+                ctx.strokeStyle = '#183250';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Draw percentage label
+                const labelAngle = currentAngle + sliceAngle / 2;
+                const labelX = centerX + (radius * 0.65) * Math.cos(labelAngle);
+                const labelY = centerY + (radius * 0.65) * Math.sin(labelAngle);
+                ctx.fillStyle = '#fff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = 'bold 12px sans-serif';
+                const percent = Math.round((count / total) * 100);
+                
+                // Text shadow for readability
+                ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                ctx.shadowBlur = 4;
+                ctx.fillText(percent + '%', labelX, labelY);
+                ctx.shadowBlur = 0; // reset
+
+                currentAngle += sliceAngle;
+            }
+            
+            // Draw Legend on the left
+            let startX = 10;
+            let startY = 20;
+            for(let key in dataObj) {
+                ctx.fillStyle = colors[key] || '#999';
+                ctx.fillRect(startX, startY, 12, 12);
+                ctx.fillStyle = '#e8eef7';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.font = '11px sans-serif';
+                ctx.fillText(`${labels[key]} : ${dataObj[key]}件`, startX + 18, startY + 6);
+                startY += 20;
+            }
         }
+        
+        drawPieChart('m4ePieChart', userM4E);
 
         // Draw Map
-        const canvas = document.getElementById('resultMapCanvas');
-        if(!canvas) return;
-        const ctx = canvas.getContext('2d');
+        const canvasMap = document.getElementById('resultMapCanvas');
+        if(!canvasMap) return;
+        const ctxMap = canvasMap.getContext('2d');
         const img = new Image();
         
         img.onload = () => {
-            canvas.width = img.width;
-            canvas.height = img.height;
+            canvasMap.width = img.width;
+            canvasMap.height = img.height;
             
-            ctx.drawImage(img, 0, 0);
+            ctxMap.drawImage(img, 0, 0);
             
             if(hullPoints.length > 0) {
-                ctx.beginPath();
-                ctx.moveTo(hullPoints[0].x, hullPoints[0].y);
+                ctxMap.beginPath();
+                ctxMap.moveTo(hullPoints[0].x, hullPoints[0].y);
                 for(let i=1; i<hullPoints.length; i++) {
-                    ctx.lineTo(hullPoints[i].x, hullPoints[i].y);
+                    ctxMap.lineTo(hullPoints[i].x, hullPoints[i].y);
                 }
-                ctx.closePath();
-                ctx.fillStyle = 'rgba(255, 255, 0, 0.2)'; 
-                ctx.fill();
-                ctx.strokeStyle = 'rgba(255, 255, 0, 0.6)';
-                ctx.lineWidth = 2;
-                ctx.stroke();
+                ctxMap.closePath();
+                ctxMap.fillStyle = 'rgba(255, 255, 0, 0.2)'; 
+                ctxMap.fill();
+                ctxMap.strokeStyle = 'rgba(255, 255, 0, 0.6)';
+                ctxMap.lineWidth = 2;
+                ctxMap.stroke();
             }
             
             visitedPoints.forEach(pt => {
-                ctx.beginPath();
-                ctx.arc(pt.x, pt.y, 15, 0, 2 * Math.PI);
+                ctxMap.beginPath();
+                ctxMap.arc(pt.x, pt.y, 15, 0, 2 * Math.PI);
                 
-                if(pt.type === 'EVENT') ctx.fillStyle = 'rgba(226, 99, 99, 0.9)'; 
-                else if(pt.type === 'ITEM') ctx.fillStyle = 'rgba(100, 168, 135, 0.9)'; 
-                else ctx.fillStyle = 'rgba(75, 120, 168, 0.9)'; 
+                if(pt.type === 'EVENT') ctxMap.fillStyle = 'rgba(226, 99, 99, 0.9)'; 
+                else if(pt.type === 'ITEM') ctxMap.fillStyle = 'rgba(100, 168, 135, 0.9)'; 
+                else ctxMap.fillStyle = 'rgba(75, 120, 168, 0.9)'; 
                 
-                ctx.fill();
-                ctx.lineWidth = 4;
-                ctx.strokeStyle = '#fff';
-                ctx.stroke();
+                ctxMap.fill();
+                ctxMap.lineWidth = 4;
+                ctxMap.strokeStyle = '#fff';
+                ctxMap.stroke();
             });
         };
         
