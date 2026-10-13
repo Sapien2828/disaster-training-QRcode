@@ -1,4 +1,4 @@
-// Main application logic
+// Main application logic - v19 Clean & Triple Checked
 let scanning = false;
 let streamRef = null;
 let masterData = []; 
@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const s = diffSec % 60;
             timerDisplay.innerText = `経過: ${m}分${s}秒`;
             
-            if (m >= 30 && document.getElementById('modalTitle') && document.getElementById('modalTitle'].innerText !== '訓練終了') {
+            if (m >= 30 && document.getElementById('modalTitle') && document.getElementById('modalTitle').innerText !== '訓練終了') {
                 window.showEndScreen();
             }
         }, 1000);
@@ -162,12 +162,15 @@ document.addEventListener('DOMContentLoaded', () => {
         );
 
         if (matchedRecord) {
-            // Check if it's an EVENT (has event_stage in K column or event_id in J column)
-            if (matchedRecord.event_stage && matchedRecord.event_stage.trim() !== '') {
+            // Check record_type or event_stage (K列)
+            const rType = (matchedRecord.record_type || '').trim().toUpperCase();
+            const stage = (matchedRecord.event_stage || '').trim();
+            
+            if (rType === 'EVENT' || stage !== '') {
                 showEventModal(matchedRecord);
-            } else if (matchedRecord.item_name && matchedRecord.item_name.trim() !== '') {
+            } else if (rType === 'ITEM' || (matchedRecord.item_name && matchedRecord.item_name.trim() !== '')) {
                 showItemCheckModal(matchedRecord, 'ITEM');
-            } else if (matchedRecord.check_name && matchedRecord.check_name.trim() !== '') {
+            } else if (rType === 'CHECK' || (matchedRecord.check_name && matchedRecord.check_name.trim() !== '')) {
                 showItemCheckModal(matchedRecord, 'CHECK');
             } else {
                 showModal("エラー", "有効なイベントまたはアイテム情報が見つかりません。");
@@ -200,7 +203,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const optsContainer = document.getElementById('modalOptions');
         optsContainer.innerHTML = ''; 
         
-        // Options from V, Z, AD, AH (Option names) and scores from W, AA, AE, AI (or total scores X, AB, AF, AJ)
         const options = [
             { text: record.option_a_name, score: record.option_a_score || record.option_a_total_score, outcome: record.option_a_outcome },
             { text: record.option_b_name, score: record.option_b_score || record.option_b_total_score, outcome: record.option_b_outcome },
@@ -233,7 +235,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const record = currentEventRecord;
         const session = JSON.parse(localStorage.getItem('disaster_training_session'));
         
-        // After answering, display outcome and scores (AA, AE, AI, AM etc.)
         const resultBody = `
             <p style="font-weight:bold; color:var(--color-primary);">選択: ${optionData.text}</p>
             <div style="background:var(--color-surface-raised); padding:10px; margin-top:10px; border-radius:5px;">
@@ -282,12 +283,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const isItem = type === 'ITEM';
         const titleText = isItem ? `【ITEM発見】` : `【CHECK完了】`;
         
-        // If K column is empty, show S (check_name/item_name). If still empty, show U (weight/score).
         let displayName = '';
         if (isItem) {
-            displayName = record.item_name || record.check_name || record.S/A/B/C重みづけ係数 || '不明なアイテム';
+            displayName = record.item_name || record.check_name || record.tool_code || '不明なアイテム';
         } else {
-            displayName = record.check_name || record.item_name || record['S/A/B/C重みづけ係数'] || record.Item_score || '不明なチェック項目';
+            displayName = record.check_name || record.item_name || record.tool_code || '不明なチェック項目';
         }
         
         const bodyHtml = `
@@ -311,7 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
             scanned_at: currentScannedAt ? currentScannedAt.toISOString() : now.toISOString(),
             thinking_time_sec: thinkingTimeSec,
             selected_option: displayName,
-            option_score: record.Item_score || record.CHECK_score || record['S/A/B/C重みづけ係数'] || ''
+            option_score: record.Item_score || record.CHECK_score || ''
         };
 
         if (typeof sendLog === 'function') sendLog(logData);
