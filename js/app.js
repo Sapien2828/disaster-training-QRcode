@@ -1,4 +1,4 @@
-// Main application logic - v23 Robust Matching + Cache Bust
+// Main application logic - v25
 let scanning = false;
 let streamRef = null;
 let masterData = []; 
@@ -36,13 +36,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (timeDisplay && session) {
         if (typeof Papa !== 'undefined') {
-            // キャッシュバスターを追加し、常に最新のCSVを読み込む
             Papa.parse('data/data.csv?v=' + new Date().getTime(), {
                 download: true,
                 header: true,
+                transformHeader: function(h) { return h.trim(); }, // Ensure headers are clean
                 complete: function(results) {
                     masterData = results.data;
-                    console.log('CSV Loaded:', masterData.length, 'records from data.csv.');
+                    console.log('CSV Loaded:', masterData.length, 'records.');
                 }
             });
         }
@@ -152,35 +152,47 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(window.tick);
     };
 
-    function getSafeValue(record, possibleKeys) {
-        if (!record) return '';
-        for (let key in record) {
-            for (let pk of possibleKeys) {
-                if (key.includes(pk)) return record[key];
-            }
-        }
-        return '';
-    }
-    
     function handleQRCodeScan(scannedCode) {
         const rawCode = scannedCode.trim();
         const formattedCode = rawCode.padStart(4, '0');
         const numCode = parseInt(rawCode, 10);
         const session = JSON.parse(localStorage.getItem('disaster_training_session'));
         
-        // 【最重要修正】card_noの形式違いによる「未登録コード」エラーを完全に防止する判定
+        if (!session) {
+            alert("セッション情報がありません。トップページに戻ります。");
+            window.location.href = "index.html";
+            return;
+        }
+
         const matchedRecord = masterData.find(row => {
-            const rowCardNo = row.card_no ? row.card_no.toString().trim() : "";
-            // CSV側が "1" でスキャンが "0001" でも一致するようにする
-            const isCardMatch = (rowCardNo === formattedCode || rowCardNo === rawCode || parseInt(rowCardNo, 10) === numCode);
-            const isDiffMatch = row.difficulty === session.difficulty;
+            const rowCardNoStr = row.card_no ? String(row.card_no).trim() : "";
+            const rowCardNoInt = parseInt(rowCardNoStr, 10);
+            const isCardMatch = (rowCardNoStr === formattedCode || rowCardNoStr === rawCode || rowCardNoInt === numCode);
+            const isDiffMatch = (row.difficulty || "").trim() === (session.difficulty || "").trim();
             return isCardMatch && isDiffMatch;
         });
 
         if (matchedRecord) {
             const rType = (matchedRecord.record_type || '').trim().toUpperCase();
-            const stage = (matchedRecord.event_stage || '').trim();
             
+            // --- 既に読み込み済みかどうかのチェック (ITEMとCHECK) ---
+            if (rType === 'ITEM' || rType === 'CHECK') {
+                const alreadyScanned = visitedPoints.some(p => p.card_no === matchedRecord.card_no && p.type === rType);
+                if (alreadyScanned) {
+                    const optsContainer = document.getElementById('modalOptions');
+                    optsContainer.innerHTML = '';
+                    const closeBtn = document.createElement('button');
+                    closeBtn.className = 'btn-primary';
+                    closeBtn.innerText = '閉じる (再スキャン)';
+                    closeBtn.onclick = window.closeModal;
+                    optsContainer.appendChild(closeBtn);
+                    
+                    showModal("取得済み", `<div style="text-align:center;"><p style="font-weight:bold; color:var(--color-danger); font-size:1.2em;">この ${rType} は既に獲得・確認済みです。</p></div>`);
+                    return; // 処理終了
+                }
+            }
+
+            const stage = (matchedRecord.event_stage || '').trim();
             if (rType === 'EVENT' || stage !== '') {
                 showEventModal(matchedRecord);
             } else if (rType === 'ITEM' || (matchedRecord.item_name && matchedRecord.item_name.trim() !== '')) {
@@ -199,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
             closeBtn.onclick = window.closeModal;
             optsContainer.appendChild(closeBtn);
 
-            showModal("未登録コード", `入力されたコード（${rawCode}）は未登録です。<br>難易度設定などを確認してください。`);
+            showModal("未登録コード", `入力されたコード（${rawCode}）は未登録です。<br>現在の難易度: ${session.difficulty} に対応するデータが見つかりません。`);
         }
     }
 
@@ -261,8 +273,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const now = new Date();
         const thinkingTimeSec = currentScannedAt ? Math.round((now.getTime() - currentScannedAt.getTime()) / 1000) : 0;
 
-        const m4eVal = getSafeValue(record, ['4M+E', '4M', '4m', 'm4e']);
-        const sabcVal = getSafeValue(record, ['S/A/B/C評価', '評価', 'eval']);
+        // 確実に列を取得
+        const m4eVal = record['4M+E'] || record['4M'] || record['m4e'] || 'Environment';
+        const sabcVal = record['S/A/B/C評価'] || record['評価'] || record['eval'] || '';
 
         const logData = {
             ...record,
@@ -275,8 +288,8 @@ document.addEventListener('DOMContentLoaded', () => {
             thinking_time_sec: thinkingTimeSec,
             selected_option: optionData.text,
             option_score: optionData.score,
-            m4e_category: m4eVal,
-            sabc_eval: sabcVal
+            m4e_category: m4eVal, // GASへ送信
+            sabc_eval: sabcVal    // GASへ送信
         };
         
         if (typeof sendLog === 'function') sendLog(logData);
@@ -284,10 +297,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (record.x_px && record.y_px) {
             visitedPoints.push({ 
+                card_no: record.card_no,
                 x: parseFloat(record.x_px), 
                 y: parseFloat(record.y_px), 
                 type: 'EVENT',
-                m4e: m4eVal || 'Environment'
+                m4e: m4eVal
             });
         }
 
@@ -325,8 +339,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const now = new Date();
         const thinkingTimeSec = currentScannedAt ? Math.round((now.getTime() - currentScannedAt.getTime()) / 1000) : 0;
         
-        const m4eVal = getSafeValue(record, ['4M+E', '4M', '4m', 'm4e']);
-        const sabcVal = getSafeValue(record, ['S/A/B/C評価', '評価', 'eval']);
+        const m4eVal = record['4M+E'] || record['4M'] || record['m4e'] || 'Environment';
+        const sabcVal = record['S/A/B/C評価'] || record['評価'] || record['eval'] || '';
 
         const logData = {
             ...record,
@@ -340,15 +354,20 @@ document.addEventListener('DOMContentLoaded', () => {
             thinking_time_sec: thinkingTimeSec,
             selected_option: displayName,
             option_score: record.Item_score || record.CHECK_score || '',
-            m4e_category: m4eVal,
-            sabc_eval: sabcVal
+            m4e_category: m4eVal, // GASへ送信
+            sabc_eval: sabcVal    // GASへ送信
         };
 
         if (typeof sendLog === 'function') sendLog(logData);
         addLogToScreen(logData);
 
         if (record.x_px && record.y_px) {
-            visitedPoints.push({ x: parseFloat(record.x_px), y: parseFloat(record.y_px), type: type });
+            visitedPoints.push({ 
+                card_no: record.card_no,
+                x: parseFloat(record.x_px), 
+                y: parseFloat(record.y_px), 
+                type: type 
+            });
         }
 
         const optsContainer = document.getElementById('modalOptions');
