@@ -1,4 +1,4 @@
-// Main application logic - v25
+// Main application logic - v28 (Syntax Fix & Full Screen Capture)
 let scanning = false;
 let streamRef = null;
 let masterData = []; 
@@ -7,6 +7,7 @@ let visitedPoints = [];
 let currentScannedAt = null; 
 
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("App.js v28 Loaded."); // Debug log
     const startForm = document.getElementById('startForm');
     if (startForm) {
         startForm.addEventListener('submit', (e) => {
@@ -39,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
             Papa.parse('data/data.csv?v=' + new Date().getTime(), {
                 download: true,
                 header: true,
-                transformHeader: function(h) { return h.trim(); }, // Ensure headers are clean
+                transformHeader: function(h) { return h.trim(); },
                 complete: function(results) {
                     masterData = results.data;
                     console.log('CSV Loaded:', masterData.length, 'records.');
@@ -175,7 +176,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (matchedRecord) {
             const rType = (matchedRecord.record_type || '').trim().toUpperCase();
             
-            // --- 既に読み込み済みかどうかのチェック (ITEMとCHECK) ---
             if (rType === 'ITEM' || rType === 'CHECK') {
                 const alreadyScanned = visitedPoints.some(p => p.card_no === matchedRecord.card_no && p.type === rType);
                 if (alreadyScanned) {
@@ -188,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     optsContainer.appendChild(closeBtn);
                     
                     showModal("取得済み", `<div style="text-align:center;"><p style="font-weight:bold; color:var(--color-danger); font-size:1.2em;">この ${rType} は既に獲得・確認済みです。</p></div>`);
-                    return; // 処理終了
+                    return; 
                 }
             }
 
@@ -273,7 +273,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const now = new Date();
         const thinkingTimeSec = currentScannedAt ? Math.round((now.getTime() - currentScannedAt.getTime()) / 1000) : 0;
 
-        // 確実に列を取得
         const m4eVal = record['4M+E'] || record['4M'] || record['m4e'] || 'Environment';
         const sabcVal = record['S/A/B/C評価'] || record['評価'] || record['eval'] || '';
 
@@ -288,8 +287,8 @@ document.addEventListener('DOMContentLoaded', () => {
             thinking_time_sec: thinkingTimeSec,
             selected_option: optionData.text,
             option_score: optionData.score,
-            m4e_category: m4eVal, // GASへ送信
-            sabc_eval: sabcVal    // GASへ送信
+            m4e_category: m4eVal, 
+            sabc_eval: sabcVal    
         };
         
         if (typeof sendLog === 'function') sendLog(logData);
@@ -354,8 +353,8 @@ document.addEventListener('DOMContentLoaded', () => {
             thinking_time_sec: thinkingTimeSec,
             selected_option: displayName,
             option_score: record.Item_score || record.CHECK_score || '',
-            m4e_category: m4eVal, // GASへ送信
-            sabc_eval: sabcVal    // GASへ送信
+            m4e_category: m4eVal, 
+            sabc_eval: sabcVal    
         };
 
         if (typeof sendLog === 'function') sendLog(logData);
@@ -440,11 +439,9 @@ window.showEndScreen = function() {
     const itemCount = visitedPoints.filter(p => p.type === 'ITEM').length;
     const checkCount = visitedPoints.filter(p => p.type === 'CHECK').length;
 
-    // 4M+E Analysis
     const userM4E = { 'Man':0, 'Machine':0, 'Material':0, 'Method':0, 'Environment':0 };
     visitedPoints.filter(p => p.type === 'EVENT').forEach(p => {
         let cat = (p.m4e || '').trim();
-        // Fallback for exact matching
         if(cat.includes('Man')) cat = 'Man';
         else if(cat.includes('Machine')) cat = 'Machine';
         else if(cat.includes('Material')) cat = 'Material';
@@ -541,14 +538,13 @@ window.showEndScreen = function() {
     modal.classList.remove('hidden');
 
     setTimeout(() => {
-        // Native Canvas Pie Chart (No external libraries required)
         function drawPieChart(canvasId, dataObj) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
             const width = canvas.width;
             const height = canvas.height;
-            const centerX = width / 2 + 30; // Shift right for legend
+            const centerX = width / 2 + 30;
             const centerY = height / 2;
             const radius = Math.min(centerX, centerY) - 20;
 
@@ -583,7 +579,6 @@ window.showEndScreen = function() {
 
             let currentAngle = -Math.PI / 2;
             
-            // Draw Pie
             for (let key in dataObj) {
                 const count = dataObj[key];
                 if (count === 0) continue;
@@ -599,7 +594,6 @@ window.showEndScreen = function() {
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
-                // Draw percentage label
                 const labelAngle = currentAngle + sliceAngle / 2;
                 const labelX = centerX + (radius * 0.65) * Math.cos(labelAngle);
                 const labelY = centerY + (radius * 0.65) * Math.sin(labelAngle);
@@ -609,16 +603,14 @@ window.showEndScreen = function() {
                 ctx.font = 'bold 12px sans-serif';
                 const percent = Math.round((count / total) * 100);
                 
-                // Text shadow for readability
                 ctx.shadowColor = 'rgba(0,0,0,0.8)';
                 ctx.shadowBlur = 4;
                 ctx.fillText(percent + '%', labelX, labelY);
-                ctx.shadowBlur = 0; // reset
+                ctx.shadowBlur = 0;
 
                 currentAngle += sliceAngle;
             }
             
-            // Draw Legend on the left
             let startX = 10;
             let startY = 20;
             for(let key in dataObj) {
@@ -635,7 +627,6 @@ window.showEndScreen = function() {
         
         drawPieChart('m4ePieChart', userM4E);
 
-        // Draw Map
         const canvasMap = document.getElementById('resultMapCanvas');
         if(!canvasMap) return;
         const ctxMap = canvasMap.getContext('2d');
@@ -705,15 +696,6 @@ window.saveResultAsImage = function() {
         link.click();
     });
 };
-    const pid = session.participant_id || 'Unknown';
-    
-    html2canvas(content, { useCORS: true, backgroundColor: '#071426' }).then(canvas => {
-        const link = document.createElement('a');
-        link.download = `Result_${pid}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-    });
-};
 
 window.shareResultImage = async function() {
     const content = document.getElementById('captureArea');
@@ -730,27 +712,6 @@ window.shareResultImage = async function() {
         width: content.scrollWidth,
         height: content.scrollHeight
     }).then(async canvas => {
-        canvas.toBlob(async (blob) => {
-            const file = new File([blob], `Result_${pid}.png`, { type: 'image/png' });
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({
-                        files: [file],
-                        title: '災害訓練結果',
-                        text: `災害訓練アプリの実行結果です。(ID: ${pid})`
-                    });
-                } catch (error) {
-                    console.log('共有キャンセルまたはエラー', error);
-                }
-            } else {
-                alert('お使いのブラウザは画像の直接共有に対応していません。「画像を保存」してからメール等に添付してください。');
-            }
-        });
-    });
-};
-    const pid = session.participant_id || 'Unknown';
-
-    html2canvas(content, { useCORS: true, backgroundColor: '#071426' }).then(async canvas => {
         canvas.toBlob(async (blob) => {
             const file = new File([blob], `Result_${pid}.png`, { type: 'image/png' });
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
