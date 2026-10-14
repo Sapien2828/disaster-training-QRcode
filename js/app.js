@@ -689,6 +689,24 @@ window.saveResultAsImage = function() {
     const session = JSON.parse(localStorage.getItem('disaster_training_session')) || {};
     const pid = session.participant_id || 'Unknown';
     
+    // スクロールで隠れている部分も含めて全体の高さを取得して画像化
+    html2canvas(content, { 
+        useCORS: true, 
+        backgroundColor: '#071426',
+        scrollY: -window.scrollY,
+        windowWidth: content.scrollWidth,
+        windowHeight: content.scrollHeight,
+        width: content.scrollWidth,
+        height: content.scrollHeight
+    }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `Result_${pid}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    });
+};
+    const pid = session.participant_id || 'Unknown';
+    
     html2canvas(content, { useCORS: true, backgroundColor: '#071426' }).then(canvas => {
         const link = document.createElement('a');
         link.download = `Result_${pid}.png`;
@@ -700,6 +718,36 @@ window.saveResultAsImage = function() {
 window.shareResultImage = async function() {
     const content = document.getElementById('captureArea');
     const session = JSON.parse(localStorage.getItem('disaster_training_session')) || {};
+    const pid = session.participant_id || 'Unknown';
+
+    // スクロールで隠れている部分も含めて全体の高さを取得して画像化
+    html2canvas(content, { 
+        useCORS: true, 
+        backgroundColor: '#071426',
+        scrollY: -window.scrollY,
+        windowWidth: content.scrollWidth,
+        windowHeight: content.scrollHeight,
+        width: content.scrollWidth,
+        height: content.scrollHeight
+    }).then(async canvas => {
+        canvas.toBlob(async (blob) => {
+            const file = new File([blob], `Result_${pid}.png`, { type: 'image/png' });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: '災害訓練結果',
+                        text: `災害訓練アプリの実行結果です。(ID: ${pid})`
+                    });
+                } catch (error) {
+                    console.log('共有キャンセルまたはエラー', error);
+                }
+            } else {
+                alert('お使いのブラウザは画像の直接共有に対応していません。「画像を保存」してからメール等に添付してください。');
+            }
+        });
+    });
+};
     const pid = session.participant_id || 'Unknown';
 
     html2canvas(content, { useCORS: true, backgroundColor: '#071426' }).then(async canvas => {
