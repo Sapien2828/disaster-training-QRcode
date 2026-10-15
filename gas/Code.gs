@@ -30,7 +30,8 @@ function doPost(e) {
       'Record_Type', 
       '4M_E_Category',             
       'S_A_B_C_Eval',              
-      'Is_Hold(保留したか)',         
+      'Is_Hold(保留したか)',
+      'Height_Zone',
       'Log_ID', 
       'Selected_Option', 
       'Option_Score', 
@@ -53,14 +54,14 @@ function doPost(e) {
       data.record_type || '',                                             
       data.m4e_category || data['4M+E'] || '',                            
       data.sabc_eval || data['S/A/B/C評価'] || '',                        
-      isHold,                                                             
+      isHold,
+      data.height_zone || '',
       data.log_id || '',                                                  
       data.selected_option || '',                                         
       data.option_score !== undefined ? data.option_score : '',           
       JSON.stringify(data)                                                
     ];
     
-    // 1. ALL_LOGS
     let masterSheet = ss.getSheetByName('ALL_LOGS');
     if (!masterSheet) {
       masterSheet = ss.insertSheet('ALL_LOGS');
@@ -68,7 +69,6 @@ function doPost(e) {
     }
     masterSheet.appendRow(rowData);
     
-    // 2. Individual sheets
     const recordType = (data.record_type || 'OTHER').toUpperCase();
     let targetSheetName = 'OTHER_LOGS';
     if (recordType === 'EVENT') targetSheetName = 'EVENT';
