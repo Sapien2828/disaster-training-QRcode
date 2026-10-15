@@ -1,4 +1,4 @@
-// Main application logic - v28 (Syntax Fix & Full Screen Capture)
+// Main application logic - v31 (Side-by-side stats)
 let scanning = false;
 let streamRef = null;
 let masterData = []; 
@@ -7,7 +7,7 @@ let visitedPoints = [];
 let currentScannedAt = null; 
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("App.js v28 Loaded."); // Debug log
+    console.log("App.js v31 Loaded.");
     const startForm = document.getElementById('startForm');
     if (startForm) {
         startForm.addEventListener('submit', (e) => {
@@ -275,6 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const m4eVal = record['4M+E'] || record['4M'] || record['m4e'] || 'Environment';
         const sabcVal = record['S/A/B/C評価'] || record['評価'] || record['eval'] || '';
+        const hzVal = record['height_zone'] || 'MID';
 
         const logData = {
             ...record,
@@ -288,7 +289,8 @@ document.addEventListener('DOMContentLoaded', () => {
             selected_option: optionData.text,
             option_score: optionData.score,
             m4e_category: m4eVal, 
-            sabc_eval: sabcVal    
+            sabc_eval: sabcVal,
+            height_zone: hzVal
         };
         
         if (typeof sendLog === 'function') sendLog(logData);
@@ -300,7 +302,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 x: parseFloat(record.x_px), 
                 y: parseFloat(record.y_px), 
                 type: 'EVENT',
-                m4e: m4eVal
+                m4e: m4eVal,
+                height_zone: hzVal
             });
         }
 
@@ -340,6 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const m4eVal = record['4M+E'] || record['4M'] || record['m4e'] || 'Environment';
         const sabcVal = record['S/A/B/C評価'] || record['評価'] || record['eval'] || '';
+        const hzVal = record['height_zone'] || 'MID';
 
         const logData = {
             ...record,
@@ -354,7 +358,8 @@ document.addEventListener('DOMContentLoaded', () => {
             selected_option: displayName,
             option_score: record.Item_score || record.CHECK_score || '',
             m4e_category: m4eVal, 
-            sabc_eval: sabcVal    
+            sabc_eval: sabcVal,
+            height_zone: hzVal
         };
 
         if (typeof sendLog === 'function') sendLog(logData);
@@ -365,7 +370,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 card_no: record.card_no,
                 x: parseFloat(record.x_px), 
                 y: parseFloat(record.y_px), 
-                type: type 
+                type: type,
+                height_zone: hzVal
             });
         }
 
@@ -450,6 +456,17 @@ window.showEndScreen = function() {
         if(userM4E[cat] !== undefined) userM4E[cat]++;
     });
 
+    const userHeight = { 'HIGH':0, 'MID':0, 'LOW':0 };
+    visitedPoints.forEach(p => {
+        let h = (p.height_zone || 'MID').trim().toUpperCase();
+        if(userHeight[h] !== undefined) userHeight[h]++;
+    });
+
+    let totalHeight = userHeight['HIGH'] + userHeight['MID'] + userHeight['LOW'];
+    let highRate = totalHeight > 0 ? Math.round((userHeight['HIGH'] / totalHeight) * 100) : 0;
+    let midRate = totalHeight > 0 ? Math.round((userHeight['MID'] / totalHeight) * 100) : 0;
+    let lowRate = totalHeight > 0 ? Math.round((userHeight['LOW'] / totalHeight) * 100) : 0;
+
     function convexHull(points) {
         const unique = [];
         const seen = new Set();
@@ -507,13 +524,47 @@ window.showEndScreen = function() {
     body.innerHTML = `
         <div id="captureArea" style="background:var(--color-bg); padding:10px; border-radius:5px;">
             <p style="text-align:center; font-size:14px; margin-bottom:10px;">30分経過または終了しました。</p>
-            <div style="background:var(--color-surface-raised); padding:10px; border-radius:5px; margin-bottom:10px; font-size:14px; line-height:1.6;">
-                <strong>【訓練実績】</strong><br>
-                ・回答 EVENT : <span style="color:var(--color-danger); font-weight:bold;">${eventCount}</span> 件<br>
-                ・発見 ITEM : <span style="color:var(--color-success); font-weight:bold;">${itemCount}</span> 件<br>
-                ・確認 CHECK : <span style="color:var(--color-primary); font-weight:bold;">${checkCount}</span> 件<br>
+            
+            <div style="background:var(--color-surface-raised); padding:10px; border-radius:5px; margin-bottom:10px;">
+                <strong style="font-size:14px;">【訓練実績】</strong>
+                <div style="display:flex; justify-content:space-between; margin-top:5px;">
+                    <div style="flex:1; font-size:13px; line-height:1.6;">
+                        ・回答 EVENT : <span style="color:var(--color-danger); font-weight:bold;">${eventCount}</span> 件<br>
+                        ・発見 ITEM : <span style="color:var(--color-success); font-weight:bold;">${itemCount}</span> 件<br>
+                        ・確認 CHECK : <span style="color:var(--color-primary); font-weight:bold;">${checkCount}</span> 件<br>
+                    </div>
+                    <div style="flex:1; border-left:1px solid var(--color-border); padding-left:10px; font-size:13px; line-height:1.6;">
+                        ・上方(HIGH): <span style="font-weight:bold; color:#ffce56;">${userHeight['HIGH'] || 0}</span> 件<br>
+                        ・平時(MID) : <span style="font-weight:bold; color:#36a2eb;">${userHeight['MID'] || 0}</span> 件<br>
+                        ・足元(LOW) : <span style="font-weight:bold; color:#ff6384;">${userHeight['LOW'] || 0}</span> 件<br>
+                    </div>
+                </div>
                 <hr style="border-color:var(--color-border); margin:5px 0;">
-                ・空間カバー率 : <strong>${coverRate} %</strong><br>
+                <div style="font-size:14px; text-align:center;">
+                    ・空間カバー率 : <strong>${coverRate} %</strong>
+                </div>
+            </div>
+
+            <div style="background:var(--color-surface-raised); padding:10px; border-radius:5px; margin-bottom:10px;">
+                <h4 style="text-align:center; margin:0 0 10px 0; color:var(--color-text);">3次元空間（Z軸）の視野バイアス</h4>
+                <div style="display:flex; justify-content: space-around; text-align:center; font-size:12px; margin-bottom: 10px;">
+                    <div>
+                        <strong>上方警戒 (HIGH)</strong><br>
+                        <span style="font-size:18px; font-weight:bold; color:#ffce56;">${highRate}%</span>
+                    </div>
+                    <div>
+                        <strong>平時視野 (MID)</strong><br>
+                        <span style="font-size:18px; font-weight:bold; color:#36a2eb;">${midRate}%</span>
+                    </div>
+                    <div>
+                        <strong>足元注意 (LOW)</strong><br>
+                        <span style="font-size:18px; font-weight:bold; color:#ff6384;">${lowRate}%</span>
+                    </div>
+                </div>
+                <canvas id="heightPieChart" width="300" height="150" style="margin: 0 auto; display: block;"></canvas>
+                <p style="font-size:10px; color:var(--color-text-muted); text-align:center; margin-top:5px;">
+                    上方(160cm以上)や足元(80cm未満)への注意が向いているかを確認しましょう。
+                </p>
             </div>
             
             <div style="background:var(--color-surface-raised); padding:10px; border-radius:5px; margin-bottom:10px;">
@@ -538,7 +589,7 @@ window.showEndScreen = function() {
     modal.classList.remove('hidden');
 
     setTimeout(() => {
-        function drawPieChart(canvasId, dataObj) {
+        function drawPieChart(canvasId, dataObj, colors, labels) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
@@ -547,21 +598,6 @@ window.showEndScreen = function() {
             const centerX = width / 2 + 30;
             const centerY = height / 2;
             const radius = Math.min(centerX, centerY) - 20;
-
-            const colors = {
-                'Man': '#ff6384',
-                'Machine': '#36a2eb',
-                'Material': '#ffce56',
-                'Method': '#4bc0c0',
-                'Environment': '#9966ff'
-            };
-            const labels = {
-                'Man': '人(Man)',
-                'Machine': '機器(Machine)',
-                'Material': '物資(Material)',
-                'Method': '手順(Method)',
-                'Environment': '環境(Env)'
-            };
 
             let total = 0;
             for (let key in dataObj) total += dataObj[key];
@@ -573,7 +609,7 @@ window.showEndScreen = function() {
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.font = '12px sans-serif';
-                ctx.fillText('イベント対応データがありません', centerX, centerY);
+                ctx.fillText('データがありません', centerX, centerY);
                 return;
             }
 
@@ -625,7 +661,17 @@ window.showEndScreen = function() {
             }
         }
         
-        drawPieChart('m4ePieChart', userM4E);
+        drawPieChart('m4ePieChart', userM4E, {
+            'Man': '#ff6384', 'Machine': '#36a2eb', 'Material': '#ffce56', 'Method': '#4bc0c0', 'Environment': '#9966ff'
+        }, {
+            'Man': '人(Man)', 'Machine': '機器(Machine)', 'Material': '物資(Material)', 'Method': '手順(Method)', 'Environment': '環境(Env)'
+        });
+
+        drawPieChart('heightPieChart', userHeight, {
+            'HIGH': '#ffce56', 'MID': '#36a2eb', 'LOW': '#ff6384'
+        }, {
+            'HIGH': '上方(HIGH)', 'MID': '平時(MID)', 'LOW': '足元(LOW)'
+        });
 
         const canvasMap = document.getElementById('resultMapCanvas');
         if(!canvasMap) return;
