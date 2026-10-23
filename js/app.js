@@ -219,12 +219,18 @@ document.addEventListener('DOMContentLoaded', () => {
         currentEventRecord = record;
         
         const titleText = `【EVENT】${record.location_name || ''}`;
+        
+        // カード番号から画像ファイル名を作成 (例: 1 -> 0001.jpg)
+        const imgName = String(record.card_no).trim().padStart(4, '0') + '.jpg';
+        
         const bodyHtml = `
             <div style="text-align: center; margin-bottom: 10px;">
-                <p style="color:var(--color-danger); font-weight:bold; font-size: 1.2em;">${record.event_name || ''}</p>
+                <p style="color:var(--color-danger); font-weight:bold; font-size: 1.2em; margin: 0 0 10px 0;">${record.event_name || ''}</p>
+                <!-- 画像エラー時は自動で非表示になる安全設計 -->
+                <img src="img/${imgName}" onerror="this.style.display='none'" style="max-width: 100%; max-height: 180px; object-fit: contain; border-radius: 5px; margin-bottom: 10px;">
             </div>
-            <p>${record.event_body || ''}</p>
-            <p style="font-size: 0.8em; color: var(--color-text-muted);">※選択肢を選んでください。</p>
+            <p style="font-size: 14px; line-height: 1.5; margin-bottom: 10px;">${record.event_body || ''}</p>
+            <p style="font-size: 0.8em; color: var(--color-text-muted);">※対応を選択してください。</p>
         `;
         
         const optsContainer = document.getElementById('modalOptions');
